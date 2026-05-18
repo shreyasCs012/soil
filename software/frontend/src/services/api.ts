@@ -252,15 +252,38 @@ export async function getPesticideRecommendations(
   return apiCall<PesticideRecommendation>(`/recommend/pesticide/?${params.toString()}`);
 }
 
-// Farm endpoints
-export async function getFarms(): Promise<{ id: string; name: string }[]> {
-  return apiCall<{ id: string; name: string }[]>("/farms/");
+export interface FarmData {
+  id: number;
+  name: string;
+  location: string;
+  address: string;
+  area_acres: string | null;
+  crop_type: string;
+  soil_type: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  created_at: string;
 }
 
-export async function createFarm(name: string): Promise<{ id: string; name: string }> {
-  return apiCall<{ id: string; name: string }>("/farms/", {
+// Farm endpoints
+export async function getFarms(): Promise<FarmData[]> {
+  return apiCall<FarmData[]>("/farms/");
+}
+
+export async function createFarm(name: string): Promise<FarmData> {
+  return apiCall<FarmData>("/farms/", {
     method: "POST",
     body: JSON.stringify({ name }),
+  });
+}
+
+export async function updateFarm(
+  farmId: number,
+  data: Partial<Pick<FarmData, 'crop_type' | 'soil_type' | 'location' | 'latitude' | 'longitude' | 'name'>>,
+): Promise<FarmData> {
+  return apiCall<FarmData>(`/farms/${farmId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
   });
 }
 
@@ -278,7 +301,13 @@ export interface WeatherData {
 export async function getWeather(city: string): Promise<WeatherData> {
   const params = new URLSearchParams();
   params.append("city", city.trim());
+  return apiCall<WeatherData>(`/weather/?${params.toString()}`);
+}
 
+export async function getWeatherByCoords(lat: number, lon: number): Promise<WeatherData> {
+  const params = new URLSearchParams();
+  params.append("lat", lat.toString());
+  params.append("lon", lon.toString());
   return apiCall<WeatherData>(`/weather/?${params.toString()}`);
 }
 
@@ -289,6 +318,65 @@ export async function getDashboard(): Promise<DashboardData> {
 
 export async function getAlerts(): Promise<AlertData[]> {
   return apiCall<AlertData[]>(`/alerts/`);
+}
+
+export interface SoilPrediction {
+  predicted_ph: number;
+  predicted_nitrogen: number;
+  predicted_phosphorus: number;
+  predicted_potassium: number;
+  ph_trend: 'rising' | 'falling' | 'stable';
+  npk_trend: 'rising' | 'falling' | 'stable';
+  confidence: number;
+  analysis: string;
+  horizon_days: number;
+}
+
+export async function getSoilPrediction(farmId?: string | number): Promise<SoilPrediction> {
+  const params = new URLSearchParams();
+  if (farmId) params.append('farm_id', String(farmId));
+  const qs = params.toString();
+  return apiCall<SoilPrediction>(`/predict/soil/${qs ? `?${qs}` : ''}`);
+}
+
+export interface CropSoilRecommendation {
+  crop: string;
+  summary: string;
+  recommendations: string[];
+  urgency: 'good' | 'info' | 'warning' | 'critical';
+}
+
+export async function getCropSoilRecommendation(
+  farmId?: string | number,
+  crop?: string,
+): Promise<CropSoilRecommendation> {
+  const params = new URLSearchParams();
+  if (farmId) params.append('farm_id', String(farmId));
+  if (crop) params.append('crop', crop);
+  return apiCall<CropSoilRecommendation>(`/recommend/soil-for-crop/?${params.toString()}`);
+}
+
+export interface UserData {
+  id: number;
+  username: string;
+  email: string;
+  farmer_name: string;
+  phone: string;
+  profile_address: string;
+  farms: Array<{
+    id: number;
+    name: string;
+    location: string;
+    address: string;
+    area_acres: string | null;
+    crop_type: string;
+    soil_type: string;
+    created_at: string;
+  }>;
+}
+
+export async function getMe(): Promise<UserData> {
+  return apiCall<UserData>('/auth/me/');
 }
 
 // Helper to check if user is authenticated
