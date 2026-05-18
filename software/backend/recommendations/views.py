@@ -9,7 +9,7 @@ import pymongo
 from bson import ObjectId
 from django.conf import settings
 
-from sensors.models import SensorData
+from sensors.models import Farm, SensorData
 
 from .models import CropRecommendation, PesticideRecommendation
 from .serializers import CropRecommendationSerializer, PesticideRecommendationSerializer
@@ -283,4 +283,226 @@ class PesticideRecommendationView(APIView):
             'dosage': dosage,
             'reason': f'Generated from latest humidity {latest_reading.humidity} and temperature {latest_reading.temperature}.',
             'created_at': None,
+        })
+
+
+class SoilPredictionView(APIView):
+    """Predict pH/NPK levels for the next 3 days using the user's own sensor history."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        farm_id = request.query_params.get('farm_id')
+        user = request.user
+
+        sensor_qs = SensorData.objects.order_by('-timestamp')
+        if user.is_authenticated:
+            sensor_qs = sensor_qs.filter(farm__user=user)
+        if farm_id:
+            sensor_qs = sensor_qs.filter(farm_id=farm_id)
+        readings = list(sensor_qs[:10])
+
+        if not readings:
+            return Response(
+                {'detail': 'No sensor data found. Add a sensor reading first.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        latest = readings[0]
+        history = [
+            {
+                'timestamp': r.timestamp.isoformat(),
+                'ph': float(r.ph),
+                'nitrogen': float(r.nitrogen),
+                'phosphorus': float(r.phosphorus),
+                'potassium': float(r.potassium),
+                'soil_moisture': float(r.soil_moisture),
+                'temperature': float(r.temperature),
+            }
+            for r in reversed(readings)
+        ]
+
+        if not settings.LLM_API_KEY:
+            return Response({
+                'predicted_ph': round(float(latest.ph), 2),
+                'predicted_nitrogen': round(float(latest.nitrogen), 1),
+                'predicted_phosphorus': round(float(latest.phosphorus), 1),
+                'predicted_potassium': round(float(latest.potassium), 1),
+                'ph_trend': 'stable',
+                'npk_trend': 'stable',
+                'confidence': 0.6,
+                'analysis': 'Set LLM_API_KEY in .env for AI-powered 3-day forecasts.',
+                'horizon_days': 3,
+            })
+
+        payload = {
+            'model': settings.LLM_MODEL,
+            'messages': [
+                {
+                    'role': 'system',
+                    'content': (
+                        'You are a precision agriculture AI. Given historical soil sensor readings, '
+                        'predict the pH and NPK values for the next 3 days. '
+                        'Return only valid JSON with keys: predicted_ph (float 2dp), '
+                        'predicted_nitrogen (float 1dp), predicted_phosphorus (float 1dp), '
+                        'predicted_potassium (float 1dp), ph_trend (rising/falling/stable), '
+                        'npk_trend (rising/falling/stable), confidence (float 0-1), '
+                        'analysis (string under 120 chars).'
+                    ),
+                },
+                {
+                    'role': 'user',
+                    'content': json.dumps({'historical_readings': history, 'prediction_horizon_days': 3}),
+                },
+            ],
+            'temperature': 0.15,
+            'max_tokens': 300,
+            'response_format': {'type': 'json_object'},
+        }
+
+        try:
+            resp = requests.post(
+                f'{settings.LLM_API_BASE_URL}/chat/completions',
+                headers={'Authorization': f'Bearer {settings.LLM_API_KEY}', 'Content-Type': 'application/json'},
+                json=payload, timeout=20,
+            )
+            resp.raise_for_status()
+            data = _parse_llm_json(resp.json()['choices'][0]['message']['content'])
+        except (KeyError, TypeError, ValueError, requests.RequestException):
+            data = {}
+
+        return Response({
+            'predicted_ph':         round(float(data.get('predicted_ph', latest.ph)), 2),
+            'predicted_nitrogen':   round(float(data.get('predicted_nitrogen', latest.nitrogen)), 1),
+            'predicted_phosphorus': round(float(data.get('predicted_phosphorus', latest.phosphorus)), 1),
+            'predicted_potassium':  round(float(data.get('predicted_potassium', latest.potassium)), 1),
+            'ph_trend':   str(data.get('ph_trend', 'stable')),
+            'npk_trend':  str(data.get('npk_trend', 'stable')),
+            'confidence': float(data.get('confidence', 0.6)),
+            'analysis':   str(data.get('analysis', ''))[:200],
+            'horizon_days': 3,
+        })
+
+
+class CropSoilRecommendationView(APIView):
+    """LLM-powered soil recommendations tailored to a specific crop."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        farm_id = request.query_params.get('farm_id')
+        crop = request.query_params.get('crop', '').strip()
+        user = request.user
+
+        # Resolve farm + crop from the user's own records
+        farm_qs = Farm.objects.filter(user=user) if user.is_authenticated else Farm.objects.none()
+        target_farm = None
+        if farm_id:
+            target_farm = farm_qs.filter(id=farm_id).first()
+        if not target_farm:
+            target_farm = farm_qs.first()
+        if not crop and target_farm:
+            crop = (target_farm.crop_type or '').strip()
+
+        # Fetch user's own sensor readings
+        sensor_qs = SensorData.objects.order_by('-timestamp')
+        if user.is_authenticated:
+            sensor_qs = sensor_qs.filter(farm__user=user)
+        if farm_id:
+            sensor_qs = sensor_qs.filter(farm_id=farm_id)
+        readings = list(sensor_qs[:10])
+
+        if not readings:
+            return Response(
+                {'detail': 'No sensor data found. Add a sensor reading first.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        latest = readings[0]
+        history = [
+            {
+                'timestamp': r.timestamp.isoformat(),
+                'ph': float(r.ph),
+                'nitrogen': float(r.nitrogen),
+                'phosphorus': float(r.phosphorus),
+                'potassium': float(r.potassium),
+                'soil_moisture': float(r.soil_moisture),
+            }
+            for r in reversed(readings)
+        ]
+
+        # Rule-based fallback when no LLM key or no crop selected
+        if not settings.LLM_API_KEY or not crop:
+            return Response({
+                'crop': crop or 'your crop',
+                'summary': (
+                    f'Soil pH {latest.ph:.1f} with N={latest.nitrogen:.0f}, '
+                    f'P={latest.phosphorus:.0f}, K={latest.potassium:.0f} ppm.'
+                    + (' Set LLM_API_KEY and select a crop for AI-tailored advice.' if not settings.LLM_API_KEY else '')
+                ),
+                'recommendations': [
+                    f'pH is {latest.ph:.1f} — ideal range 6.0–7.5. Use lime (low pH) or sulfur (high pH).',
+                    f'Nitrogen at {latest.nitrogen:.0f} ppm — apply urea or DAP if below 30 ppm.',
+                    f'Phosphorus at {latest.phosphorus:.0f} ppm — apply SSP or DAP for root development.',
+                    f'Potassium at {latest.potassium:.0f} ppm — apply MOP for stress tolerance.',
+                ],
+                'urgency': 'info',
+            })
+
+        payload = {
+            'model': settings.LLM_MODEL,
+            'messages': [
+                {
+                    'role': 'system',
+                    'content': (
+                        'You are a senior agronomist AI specializing in Indian agriculture. '
+                        'Given a target crop and historical soil sensor data, provide specific '
+                        'actionable soil management recommendations. '
+                        'Return ONLY valid JSON: "crop" (string), "summary" (1-2 sentences), '
+                        '"recommendations" (array of 4-5 actionable strings with actual values), '
+                        '"urgency" (one of: good/info/warning/critical).'
+                    ),
+                },
+                {
+                    'role': 'user',
+                    'content': json.dumps({
+                        'target_crop': crop,
+                        'historical_soil_readings': history,
+                        'latest': {
+                            'ph': float(latest.ph),
+                            'nitrogen': float(latest.nitrogen),
+                            'phosphorus': float(latest.phosphorus),
+                            'potassium': float(latest.potassium),
+                            'soil_moisture': float(latest.soil_moisture),
+                        },
+                    }),
+                },
+            ],
+            'temperature': 0.25,
+            'max_tokens': 550,
+            'response_format': {'type': 'json_object'},
+        }
+
+        try:
+            resp = requests.post(
+                f'{settings.LLM_API_BASE_URL}/chat/completions',
+                headers={'Authorization': f'Bearer {settings.LLM_API_KEY}', 'Content-Type': 'application/json'},
+                json=payload, timeout=25,
+            )
+            resp.raise_for_status()
+            data = _parse_llm_json(resp.json()['choices'][0]['message']['content'])
+        except (KeyError, TypeError, ValueError, requests.RequestException):
+            data = {}
+
+        recs = data.get('recommendations', [])
+        if not isinstance(recs, list):
+            recs = [str(recs)]
+        recs = [str(r)[:200] for r in recs[:5]]
+        urgency = str(data.get('urgency', 'info')).lower()
+        if urgency not in {'good', 'info', 'warning', 'critical'}:
+            urgency = 'info'
+
+        return Response({
+            'crop':            str(data.get('crop', crop))[:80],
+            'summary':         str(data.get('summary', ''))[:350],
+            'recommendations': recs,
+            'urgency':         urgency,
         })
