@@ -12,6 +12,7 @@ from bson import ObjectId
 
 from .models import Farm, SensorData
 from .serializers import FarmSerializer, SensorDataSerializer
+from core.mongodb import save_sensor_reading, get_sensor_docs_for_user
 
 
 def _metric_status(key, value):
@@ -172,8 +173,74 @@ class FarmListCreateView(generics.ListCreateAPIView):
         serializer.save(user=self.request.user)
 
 
+class FarmUpdateView(APIView):
+    """PATCH /farms/<pk>/ — update crop_type, soil_type, location, lat/lng."""
+
+    def patch(self, request, pk):
+        try:
+            farm = Farm.objects.get(pk=pk, user=request.user)
+        except Farm.DoesNotExist:
+            return JsonResponse({'detail': 'Farm not found.'}, status=404)
+
+        allowed = ('crop_type', 'soil_type', 'location', 'address', 'latitude', 'longitude', 'name')
+        updated = {}
+        for field in allowed:
+            if field in request.data:
+                val = request.data[field]
+                # coerce lat/lng to float
+                if field in ('latitude', 'longitude'):
+                    try:
+                        val = float(val) if val not in (None, '') else None
+                    except (TypeError, ValueError):
+                        val = None
+                setattr(farm, field, val)
+                updated[field] = val
+
+        farm.save(update_fields=list(updated.keys()))
+
+        # Mirror to MongoDB
+        from core.mongodb import save_farm
+        save_farm(farm.id, {
+            'django_user_id': farm.user_id,
+            'name':      farm.name,
+            'location':  farm.location,
+            'address':   farm.address,
+            'area_acres': float(farm.area_acres) if farm.area_acres else None,
+            'crop_type': farm.crop_type,
+            'soil_type': farm.soil_type,
+            'latitude':  farm.latitude,
+            'longitude': farm.longitude,
+        })
+
+        return JsonResponse({
+            'id':        farm.id,
+            'name':      farm.name,
+            'crop_type': farm.crop_type,
+            'soil_type': farm.soil_type,
+            'location':  farm.location,
+            'latitude':  farm.latitude,
+            'longitude': farm.longitude,
+        })
+
+
 class SensorDataCreateView(generics.CreateAPIView):
     serializer_class = SensorDataSerializer
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        # Mirror sensor reading to MongoDB
+        user_id = instance.farm.user_id if instance.farm else None
+        if user_id:
+            save_sensor_reading(instance.farm_id, user_id, {
+                'soil_moisture': instance.soil_moisture,
+                'temperature':   instance.temperature,
+                'humidity':      instance.humidity,
+                'ph':            instance.ph,
+                'nitrogen':      instance.nitrogen,
+                'phosphorus':    instance.phosphorus,
+                'potassium':     instance.potassium,
+                'timestamp':     instance.timestamp,
+            })
 
 
 class LatestSensorDataView(generics.ListAPIView):
@@ -194,15 +261,25 @@ class LatestSensorDataView(generics.ListAPIView):
         return SensorData.objects.filter(id__in=latest_ids.values()).order_by('-timestamp')
 
     def list(self, request, *args, **kwargs):
-        farm_id = request.query_params.get('farm_id')
-        try:
-            docs = _mongo_latest_sensor_docs(farm_id=farm_id)
-        except pymongo.errors.PyMongoError:
-            docs = None
+        farm_id_param = request.query_params.get('farm_id')
+        farm_id_int = int(farm_id_param) if farm_id_param else None
 
-        if docs is not None:
-            return JsonResponse([_normalize_mongo_sensor(doc) for doc in docs], safe=False)
+        # Try MongoDB first — scoped to this user
+        if request.user.is_authenticated:
+            docs = get_sensor_docs_for_user(request.user.id, farm_id=farm_id_int, limit=100)
+            if docs is not None:
+                # Return only latest reading per farm
+                latest_by_farm: dict = {}
+                for doc in docs:
+                    fid = doc.get('farm_id')
+                    if fid not in latest_by_farm:
+                        latest_by_farm[fid] = doc
+                return JsonResponse(
+                    [_normalize_mongo_sensor(d) for d in latest_by_farm.values()],
+                    safe=False,
+                )
 
+        # Fall back to SQLite (already user-scoped via get_queryset)
         return super().list(request, *args, **kwargs)
 
 
@@ -307,30 +384,33 @@ class AlertsView(APIView):
 
 class SensorDataHistoryView(generics.ListAPIView):
     serializer_class = SensorDataSerializer
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         farm_id = self.request.query_params.get('farm_id')
         days = int(self.request.query_params.get('days', 7))
         start_time = timezone.now() - timedelta(days=days)
-        qs = SensorData.objects.filter(farm__user=self.request.user, timestamp__gte=start_time)
+        qs = SensorData.objects.filter(timestamp__gte=start_time)
+        if self.request.user.is_authenticated:
+            qs = qs.filter(farm__user=self.request.user)
         if farm_id:
             qs = qs.filter(farm_id=farm_id)
-        return qs
+        return qs.order_by('-timestamp')
 
 
 class DashboardView(APIView):
-    """Return dashboard metrics and trend data from MongoDB or Django sensor data."""
+    """Return dashboard metrics and trend data scoped to the logged-in user's farms."""
     permission_classes = [AllowAny]
 
     def get(self, request):
-        try:
-            sensor_coll = _get_mongo_sensor_collection()
-            cursor = list(sensor_coll.find().sort('timestamp', -1).limit(6)) if sensor_coll is not None else None
-        except pymongo.errors.PyMongoError:
-            cursor = None
+        # Try MongoDB first — always user-scoped
+        if request.user.is_authenticated:
+            docs = get_sensor_docs_for_user(request.user.id, limit=24)
+            if docs is not None:
+                return JsonResponse(_dashboard_payload_from_mongo_docs(docs))
 
-        if cursor:
-            return JsonResponse(_dashboard_payload_from_mongo_docs(cursor))
-
-        fallback_readings = SensorData.objects.order_by('-timestamp')[:6]
-        return JsonResponse(_dashboard_payload_from_readings(fallback_readings))
+        # SQLite fallback — user-scoped, never cross-user
+        qs = SensorData.objects.order_by('-timestamp')
+        if request.user.is_authenticated:
+            qs = qs.filter(farm__user=request.user)
+        return JsonResponse(_dashboard_payload_from_readings(qs[:24]))

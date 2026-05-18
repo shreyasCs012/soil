@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     FarmListCreateView,
+    FarmUpdateView,
     LatestSensorDataView,
     SensorDataCreateView,
     SensorDataHistoryView,
@@ -11,6 +12,7 @@ from .views import (
 
 urlpatterns = [
     path('farms/', FarmListCreateView.as_view(), name='farm-list-create'),
+    path('farms/<int:pk>/', FarmUpdateView.as_view(), name='farm-update'),
     path('sensor-data/', SensorDataCreateView.as_view(), name='sensor-data-create'),
     path('sensor-data/latest/', LatestSensorDataView.as_view(), name='sensor-data-latest'),
     path('sensor-data/history/', SensorDataHistoryView.as_view(), name='sensor-data-history'),
