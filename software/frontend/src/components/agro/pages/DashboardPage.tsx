@@ -1,7 +1,6 @@
 import { Activity, Droplets, FlaskConical, Leaf, Sprout, Zap } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { AiRecommendationPanel } from "../AiRecommendationPanel";
-import { FarmMap } from "../FarmMap";
 import { MetricCard } from "../MetricCard";
 import { TrendChart } from "../TrendChart";
 import { WeatherWidget } from "../WeatherWidget";
@@ -89,7 +88,6 @@ export function DashboardPage() {
 
       <section className="content-grid">
         <AiRecommendationPanel />
-        <FarmMap />
       </section>
     </div>
   );
