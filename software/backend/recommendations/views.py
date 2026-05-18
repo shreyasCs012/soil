@@ -1,3 +1,6 @@
+import json
+
+import requests
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -43,6 +46,100 @@ def _ml_boost(reading: SensorData, default_crop: str, confidence: float) -> tupl
     )[0]
     boosted_confidence = min(confidence + 0.08, 0.95) if pred != default_crop else min(confidence + 0.04, 0.95)
     return pred, boosted_confidence
+
+
+def _reading_context(reading: SensorData) -> dict:
+    return {
+        'soil_moisture': reading.soil_moisture,
+        'temperature': reading.temperature,
+        'humidity': reading.humidity,
+        'ph': reading.ph,
+        'nitrogen': reading.nitrogen,
+        'phosphorus': reading.phosphorus,
+        'potassium': reading.potassium,
+    }
+
+
+def _parse_llm_json(content: str) -> dict:
+    content = content.strip()
+    if content.startswith('```'):
+        content = content.strip('`').strip()
+        if content.startswith('json'):
+            content = content[4:].strip()
+    return json.loads(content)
+
+
+def _llm_crop_recommendation(
+    reading: SensorData,
+    fallback_crop: str,
+    fallback_confidence: float,
+    fallback_reason: str,
+) -> tuple[str, float, str]:
+    if not settings.LLM_API_KEY:
+        return fallback_crop, fallback_confidence, fallback_reason
+
+    payload = {
+        'model': settings.LLM_MODEL,
+        'messages': [
+            {
+                'role': 'system',
+                'content': (
+                    'You are an agronomy assistant for soil-health decisions. '
+                    'Return only valid JSON with keys: recommended_crop, '
+                    'confidence_score, reason, fertilizer_recommendation. '
+                    'confidence_score must be a number between 0 and 1. '
+                    'Keep reason and fertilizer_recommendation practical and concise.'
+                ),
+            },
+            {
+                'role': 'user',
+                'content': json.dumps(
+                    {
+                        'latest_sensor_reading': _reading_context(reading),
+                        'baseline_recommendation': {
+                            'recommended_crop': fallback_crop,
+                            'confidence_score': fallback_confidence,
+                            'reason': fallback_reason,
+                        },
+                    }
+                ),
+            },
+        ],
+        'temperature': 0.2,
+        'max_tokens': 350,
+        'response_format': {'type': 'json_object'},
+    }
+
+    try:
+        response = requests.post(
+            f'{settings.LLM_API_BASE_URL}/chat/completions',
+            headers={
+                'Authorization': f'Bearer {settings.LLM_API_KEY}',
+                'Content-Type': 'application/json',
+            },
+            json=payload,
+            timeout=20,
+        )
+        response.raise_for_status()
+        content = response.json()['choices'][0]['message']['content']
+        data = _parse_llm_json(content)
+    except (KeyError, TypeError, ValueError, requests.RequestException):
+        return fallback_crop, fallback_confidence, fallback_reason
+
+    crop = str(data.get('recommended_crop') or fallback_crop).strip()[:100]
+    reason = str(data.get('reason') or fallback_reason).strip()
+    fertilizer = str(data.get('fertilizer_recommendation') or '').strip()
+
+    try:
+        confidence = float(data.get('confidence_score', fallback_confidence))
+    except (TypeError, ValueError):
+        confidence = fallback_confidence
+    confidence = max(0.0, min(confidence, 0.99))
+
+    if fertilizer:
+        reason = f'{reason} Fertilization: {fertilizer}'
+
+    return crop or fallback_crop, confidence, reason or fallback_reason
 
 
 class SensorReadingSnapshot:
@@ -102,6 +199,12 @@ class CropRecommendationView(APIView):
 
         crop, confidence, reason = _rule_based_crop(latest_reading)
         crop, confidence = _ml_boost(latest_reading, crop, confidence)
+        crop, confidence, reason = _llm_crop_recommendation(
+            latest_reading,
+            crop,
+            confidence,
+            reason,
+        )
         if latest_reading.farm:
             recommendation = CropRecommendation.objects.create(
                 farm=latest_reading.farm,

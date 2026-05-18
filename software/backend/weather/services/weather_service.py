@@ -63,6 +63,11 @@ def fetch_weather_from_api(city: str) -> dict:
             raise WeatherServiceError(
                 'City not found. Please check the spelling and try again.', status_code=404
             )
+        if response.status_code == 401:
+            raise WeatherServiceError(
+                'OpenWeatherMap rejected the API key. Please check OPENWEATHERMAP_API_KEY.',
+                status_code=502,
+            )
         raise WeatherServiceError(
             f'OpenWeatherMap returned an error: {exc}', status_code=502
         )
@@ -157,13 +162,20 @@ def search_weather(city: str, cache_minutes: int = 10) -> dict:
     if not city.strip():
         raise WeatherServiceError('A city name is required.', status_code=400)
 
-    cached = get_cached_weather(city, max_age_minutes=cache_minutes)
-    if cached:
-        cached.pop('city_lower', None)
-        return cached
+    try:
+        cached = get_cached_weather(city, max_age_minutes=cache_minutes)
+        if cached:
+            cached.pop('city_lower', None)
+            return cached
+    except WeatherServiceError:
+        # Cache/database availability should not block live weather lookups.
+        pass
 
     payload = fetch_weather_from_api(city)
-    return save_weather_search(payload)
+    try:
+        return save_weather_search(payload)
+    except WeatherServiceError:
+        return _normalize_document(payload)
 
 
 def get_recent_searches(limit: int = 8) -> list[dict]:

@@ -89,6 +89,9 @@ WSGI_APPLICATION = 'core.wsgi.application'
 MONGODB_URI = os.getenv('MONGODB_URI', '').strip()
 MONGODB_NAME = os.getenv('MONGODB_NAME', '').strip()
 OPENWEATHERMAP_API_KEY = os.getenv('OPENWEATHERMAP_API_KEY', '').strip()
+LLM_API_KEY = os.getenv('LLM_API_KEY', os.getenv('GROQ_API_KEY', '')).strip()
+LLM_MODEL = os.getenv('LLM_MODEL', 'llama-3.3-70b-versatile').strip()
+LLM_API_BASE_URL = os.getenv('LLM_API_BASE_URL', 'https://api.groq.com/openai/v1').rstrip('/')
 
 DATABASES = {
     'default': {
