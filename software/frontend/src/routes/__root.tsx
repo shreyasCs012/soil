@@ -1,7 +1,20 @@
-import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
-import { Bell, Gauge, RadioTower, Settings } from "lucide-react";
+import {
+  createRootRoute,
+  HeadContent,
+  Link,
+  Outlet,
+  Scripts,
+  useNavigate,
+  useRouterState,
+} from "@tanstack/react-router";
+import { Bell, Gauge, LogOut, RadioTower, Settings, Sprout } from "lucide-react";
+import { useEffect, useState } from "react";
+import { getMe, isAuthenticated, logout, type UserData } from "../services/api";
 
 import appCss from "../styles.css?url";
+
+// Routes that don't require authentication
+const AUTH_ROUTES = new Set(["/login", "/register"]);
 
 function NotFoundComponent() {
   return (
@@ -30,21 +43,9 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { title: "Smart Agro — Advisory System" },
     ],
-    links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
-    ],
+    links: [{ rel: "stylesheet", href: appCss }],
   }),
   shellComponent: RootShell,
   component: RootComponent,
@@ -66,32 +67,108 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  const navigate = useNavigate();
+  const location = useRouterState({ select: (s) => s.location });
+  const pathname = location.pathname;
+  const isAuthRoute = AUTH_ROUTES.has(pathname);
+
+  const [user, setUser] = useState<UserData | null>(null);
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    // Skip auth check on login / register pages
+    if (isAuthRoute) {
+      setChecked(true);
+      return;
+    }
+
+    if (!isAuthenticated()) {
+      navigate({ to: "/login", replace: true });
+      setChecked(true);
+      return;
+    }
+
+    // Fetch user info for the nav bar (token might still be present but expired)
+    getMe()
+      .then((data) => {
+        setUser(data);
+        setChecked(true);
+      })
+      .catch(() => {
+        // Token expired or invalid — clear and redirect
+        logout().then(() => navigate({ to: "/login", replace: true }));
+        setChecked(true);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  // Don't render anything until auth check completes (avoids flash of protected content)
+  if (!checked) return null;
+
+  // Auth pages get no nav shell
+  if (isAuthRoute) return <Outlet />;
+
   const navItems = [
-    { to: "/" as const, label: "Dashboard", icon: Gauge },
-    { to: "/sensors" as const, label: "Sensors", icon: RadioTower },
-    { to: "/alerts" as const, label: "Alerts", icon: Bell },
-    { to: "/settings" as const, label: "Settings", icon: Settings },
+    { to: "/" as const,         label: "Dashboard", icon: Gauge },
+    { to: "/sensors" as const,  label: "Sensors",   icon: RadioTower },
+    { to: "/alerts" as const,   label: "Alerts",    icon: Bell },
+    { to: "/settings" as const, label: "Settings",  icon: Settings },
   ];
+
+  const farmName = user?.farms?.[0]?.name ?? "My Farm";
+  const farmerName = user?.farmer_name ?? user?.username ?? "";
+
+  async function handleLogout() {
+    await logout();
+    navigate({ to: "/login", replace: true });
+  }
 
   return (
     <div className="app-shell">
       <header className="top-nav">
         <Link to="/" className="brand-mark" aria-label="Smart Agro dashboard home">
-          <span className="brand-icon">SA</span>
+          <span className="brand-icon">
+            <Sprout className="h-4 w-4" />
+          </span>
           <span>
             <strong>Smart Agro</strong>
             <small>Advisory System</small>
           </span>
         </Link>
+
         <nav className="nav-links" aria-label="Main navigation">
           {navItems.map((item) => (
-            <Link key={item.to} to={item.to} className="nav-link" activeOptions={{ exact: item.to === "/" }} activeProps={{ className: "nav-link nav-link-active" }}>
+            <Link
+              key={item.to}
+              to={item.to}
+              className="nav-link"
+              activeOptions={{ exact: item.to === "/" }}
+              activeProps={{ className: "nav-link nav-link-active" }}
+            >
               <item.icon className="h-4 w-4" aria-hidden="true" />
               <span>{item.label}</span>
             </Link>
           ))}
         </nav>
+
+        {farmerName && (
+          <div className="nav-user-area">
+            <div className="nav-farmer">
+              <span className="nav-farmer-name">{farmerName}</span>
+              <span className="nav-farm-tag">{farmName}</span>
+            </div>
+            <button
+              className="nav-logout"
+              onClick={handleLogout}
+              aria-label="Sign out"
+              title="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </header>
+
       <main className="app-main">
         <Outlet />
       </main>

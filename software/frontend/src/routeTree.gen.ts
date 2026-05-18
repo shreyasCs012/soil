@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SensorsRouteImport } from './routes/sensors'
+import { Route as RegisterRouteImport } from './routes/register'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -22,6 +24,16 @@ const SettingsRoute = SettingsRouteImport.update({
 const SensorsRoute = SensorsRouteImport.update({
   id: '/sensors',
   path: '/sensors',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AlertsRoute = AlertsRouteImport.update({
@@ -38,12 +50,16 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
+  '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
   '/sensors': typeof SensorsRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
+  '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
   '/sensors': typeof SensorsRoute
   '/settings': typeof SettingsRoute
 }
@@ -51,20 +67,31 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
+  '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
   '/sensors': typeof SensorsRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/alerts' | '/sensors' | '/settings'
+  fullPaths: '/' | '/alerts' | '/login' | '/register' | '/sensors' | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/alerts' | '/sensors' | '/settings'
-  id: '__root__' | '/' | '/alerts' | '/sensors' | '/settings'
+  to: '/' | '/alerts' | '/login' | '/register' | '/sensors' | '/settings'
+  id:
+    | '__root__'
+    | '/'
+    | '/alerts'
+    | '/login'
+    | '/register'
+    | '/sensors'
+    | '/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlertsRoute: typeof AlertsRoute
+  LoginRoute: typeof LoginRoute
+  RegisterRoute: typeof RegisterRoute
   SensorsRoute: typeof SensorsRoute
   SettingsRoute: typeof SettingsRoute
 }
@@ -83,6 +110,20 @@ declare module '@tanstack/react-router' {
       path: '/sensors'
       fullPath: '/sensors'
       preLoaderRoute: typeof SensorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/alerts': {
@@ -105,6 +146,8 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlertsRoute: AlertsRoute,
+  LoginRoute: LoginRoute,
+  RegisterRoute: RegisterRoute,
   SensorsRoute: SensorsRoute,
   SettingsRoute: SettingsRoute,
 }
