@@ -1,0 +1,251 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #eef2ff;
+  color: #111827;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #eef2ff;
+}
+
+.weather-page {
+  min-height: 100vh;
+  padding: 2rem 1rem;
+  display: flex;
+  justify-content: center;
+}
+
+.weather-panel {
+  width: min(1100px, 100%);
+  background: #ffffff;
+  border-radius: 28px;
+  padding: 2rem;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.12);
+}
+
+.weather-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.75rem;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #4338ca;
+}
+
+.weather-header h1 {
+  margin: 0.25rem 0 0.5rem;
+  font-size: clamp(2rem, 2.5vw, 2.8rem);
+  line-height: 1.05;
+}
+
+.weather-header p {
+  margin: 0;
+  color: #6b7280;
+  max-width: 46rem;
+}
+
+.status-pill {
+  padding: 0.75rem 1rem;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.search-box {
+  margin-bottom: 1rem;
+}
+
+.search-box label {
+  display: block;
+  margin-bottom: 0.75rem;
+  font-weight: 700;
+}
+
+.search-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+}
+
+.search-row input {
+  width: 100%;
+  padding: 1rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 16px;
+  font-size: 1rem;
+}
+
+.search-row button {
+  padding: 1rem 1.25rem;
+  border: none;
+  border-radius: 16px;
+  background: #4338ca;
+  color: #f8fafc;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.help-text {
+  margin: 0.75rem 0 0;
+  color: #6b7280;
+}
+
+.message {
+  padding: 1rem 1.2rem;
+  border-radius: 16px;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.message-error {
+  color: #991b1b;
+  background: #fef2f2;
+  border: 1px solid #fecdd3;
+}
+
+.message-loading {
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.weather-card {
+  background: #f8fafc;
+  border-radius: 24px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.weather-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.weather-city {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 800;
+}
+
+.weather-description {
+  margin: 0.35rem 0 0;
+  color: #475569;
+}
+
+.weather-card-header img {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+}
+
+.weather-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.weather-metric {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+}
+
+.weather-metric span {
+  display: block;
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin-bottom: 0.6rem;
+}
+
+.weather-metric strong {
+  font-size: 1.35rem;
+  display: block;
+}
+
+.recent-searches {
+  margin-top: 1.5rem;
+}
+
+.recent-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.recent-head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.recent-head p {
+  margin: 0;
+  color: #6b7280;
+}
+
+.recent-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.recent-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 1rem;
+  background: #ffffff;
+  color: #111827;
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.recent-item:hover {
+  transform: translateY(-2px);
+  border-color: #4338ca;
+}
+
+.muted-text {
+  margin: 0;
+  color: #6b7280;
+}
+
+@media (max-width: 720px) {
+  .weather-panel {
+    padding: 1.25rem;
+  }
+
+  .search-row {
+    grid-template-columns: 1fr;
+  }
+
+  .weather-card-grid {
+    grid-template-columns: 1fr;
+  }
+}

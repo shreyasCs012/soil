@@ -1,7 +1,7 @@
 from django.urls import path
 
-from .views import WeatherView
+from .views import WeatherPageView
 
 urlpatterns = [
-    path('weather/', WeatherView.as_view(), name='weather'),
+    path('', WeatherPageView.as_view(), name='weather_search'),
 ]

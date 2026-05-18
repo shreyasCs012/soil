@@ -18,6 +18,7 @@ class SensorData(models.Model):
     soil_moisture = models.FloatField()
     temperature = models.FloatField()
     humidity = models.FloatField()
+    ph = models.FloatField(default=6.8)
     nitrogen = models.FloatField()
     phosphorus = models.FloatField()
     potassium = models.FloatField()

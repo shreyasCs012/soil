@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Weather Search</title>
+    <link rel="stylesheet" href="/static/weather/weather.css" />
+  </head>
+  <body>
+    <main class="weather-page">
+      <section class="weather-panel">
+        <div class="weather-header">
+          <div>
+            <p class="eyebrow">Weather Search</p>
+            <h1>Check the current weather by city</h1>
+            <p>Search any city, view live weather results, and keep recent queries saved in MongoDB.</p>
+          </div>
+          <div class="status-pill">OpenWeatherMap + MongoDB</div>
+        </div>
+
+        <form id="weather-form" class="search-box" autocomplete="off">
+          <label for="city-input">City name</label>
+          <div class="search-row">
+            <input id="city-input" name="city" type="text" placeholder="e.g. New Delhi" required />
+            <button type="submit">Search</button>
+          </div>
+          <p class="help-text">Type a city and click Search to see the latest forecast card.</p>
+        </form>
+
+        <div id="weather-error" class="message message-error hidden"></div>
+        <div id="weather-loading" class="message message-loading hidden">Loading weather...</div>
+
+        <section id="weather-card" class="weather-card hidden" aria-live="polite">
+          <div class="weather-card-header">
+            <div>
+              <p id="weather-city" class="weather-city"></p>
+              <p id="weather-description" class="weather-description"></p>
+            </div>
+            <img id="weather-icon" src="" alt="Weather icon" />
+          </div>
+          <div class="weather-card-grid">
+            <div class="weather-metric">
+              <span>Temperature</span>
+              <strong id="weather-temperature"></strong>
+            </div>
+            <div class="weather-metric">
+              <span>Humidity</span>
+              <strong id="weather-humidity"></strong>
+            </div>
+            <div class="weather-metric">
+              <span>Wind speed</span>
+              <strong id="weather-wind"></strong>
+            </div>
+            <div class="weather-metric">
+              <span>Retrieved</span>
+              <strong id="weather-timestamp"></strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="recent-searches">
+          <div class="recent-head">
+            <h2>Recent searches</h2>
+            <p>Click a recent city to reload the latest forecast.</p>
+          </div>
+          <div class="recent-list">
+            {% if recent_searches %}
+              {% for search in recent_searches %}
+                <button type="button" class="recent-item" data-city="{{ search.city }}">
+                  {{ search.city }} · {{ search.temperature }}° · {{ search.description }}
+                </button>
+              {% endfor %}
+            {% else %}
+              <p class="muted-text">No recent weather searches yet.</p>
+            {% endif %}
+          </div>
+        </section>
+      </section>
+    </main>
+
+    {% if latest_search %}
+      {{ latest_search|json_script:"latest-weather-data" }}
+    {% endif %}
+
+    <script>
+      const form = document.querySelector('#weather-form');
+      const cityInput = document.querySelector('#city-input');
+      const errorBox = document.querySelector('#weather-error');
+      const loadingBox = document.querySelector('#weather-loading');
+      const resultCard = document.querySelector('#weather-card');
+      const weatherCity = document.querySelector('#weather-city');
+      const weatherDescription = document.querySelector('#weather-description');
+      const weatherIcon = document.querySelector('#weather-icon');
+      const weatherTemperature = document.querySelector('#weather-temperature');
+      const weatherHumidity = document.querySelector('#weather-humidity');
+      const weatherWind = document.querySelector('#weather-wind');
+      const weatherTimestamp = document.querySelector('#weather-timestamp');
+
+      const showError = (message) => {
+        errorBox.textContent = message;
+        errorBox.classList.remove('hidden');
+        resultCard.classList.add('hidden');
+      };
+
+      const clearStatus = () => {
+        errorBox.classList.add('hidden');
+        loadingBox.classList.add('hidden');
+      };
+
+      const renderWeather = (data) => {
+        weatherCity.textContent = data.city;
+        weatherDescription.textContent = data.description;
+        weatherIcon.src = data.icon_url;
+        weatherIcon.alt = data.description;
+        weatherTemperature.textContent = `${data.temperature}°C`;
+        weatherHumidity.textContent = `${data.humidity}%`;
+        weatherWind.textContent = `${data.wind_speed} m/s`;
+        weatherTimestamp.textContent = new Date(data.timestamp).toLocaleString();
+        resultCard.classList.remove('hidden');
+      };
+
+      const latestWeatherDataScript = document.getElementById('latest-weather-data');
+      if (latestWeatherDataScript && latestWeatherDataScript.textContent.trim()) {
+        try {
+          const latestWeather = JSON.parse(latestWeatherDataScript.textContent);
+          renderWeather(latestWeather);
+          cityInput.value = latestWeather.city;
+        } catch (error) {
+          console.warn('Unable to parse latest weather data:', error);
+        }
+      }
+
+      const fetchWeather = async (city) => {
+        clearStatus();
+        loadingBox.classList.remove('hidden');
+
+        try {
+          const response = await fetch(`/api/weather/?city=${encodeURIComponent(city)}`);
+          const payload = await response.json();
+
+          if (!response.ok) {
+            throw new Error(payload.detail || 'Unable to fetch weather data.');
+          }
+
+          renderWeather(payload);
+        } catch (error) {
+          showError(error.message);
+        } finally {
+          loadingBox.classList.add('hidden');
+        }
+      };
+
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const city = cityInput.value.trim();
+        if (!city) {
+          showError('Please enter a city name.');
+          return;
+        }
+        fetchWeather(city);
+      });
+
+      document.querySelectorAll('.recent-item').forEach((button) => {
+        button.addEventListener('click', () => {
+          const city = button.dataset.city;
+          cityInput.value = city;
+          fetchWeather(city);
+        });
+      });
+    </script>
+  </body>
+</html>

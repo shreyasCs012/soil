@@ -24,12 +24,13 @@ class Command(BaseCommand):
 
         reading = SensorData.objects.create(
             farm=farm,
-            soil_moisture=62.3,
-            temperature=29.1,
-            humidity=71.2,
-            nitrogen=43.0,
-            phosphorus=21.8,
-            potassium=25.1,
+            soil_moisture=0,
+            temperature=0,
+            humidity=0,
+            ph=0,
+            nitrogen=0,
+            phosphorus=0,
+            potassium=0,
         )
 
         CropRecommendation.objects.create(

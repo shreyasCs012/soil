@@ -19,6 +19,7 @@ class SensorDataSerializer(serializers.ModelSerializer):
             'soil_moisture',
             'temperature',
             'humidity',
+            'ph',
             'nitrogen',
             'phosphorus',
             'potassium',
