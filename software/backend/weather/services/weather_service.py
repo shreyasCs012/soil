@@ -263,12 +263,14 @@ def search_weather(city: str = None, lat: float = None, lon: float = None,
 
     # ── Lat/lon path ──────────────────────────────────────────────────────
     else:
-        city_name = _reverse_geocode(lat, lon)
-        payload   = _fetch_one_call(lat, lon, city_name)
+        # Always fetch 2.5 first to get the proper city-level name from the
+        # API response (reverse-geocoding often returns hyper-local names).
+        payload_25  = _fetch_25(lat=lat, lon=lon)
+        city_name   = payload_25["city"]          # e.g. "Bengaluru"
 
-        if payload is None:
-            # One Call not subscribed → 2.5 with lat/lon (returns city name in response)
-            payload = _fetch_25(lat=lat, lon=lon)
+        # Try to upgrade to One Call 3.0 (richer data) using that city name
+        payload_oc  = _fetch_one_call(lat, lon, city_name)
+        payload     = payload_oc if payload_oc is not None else payload_25
 
     _save(payload)
     return _normalize(payload)
