@@ -1,7 +1,28 @@
-import { Bell, CheckCircle2, Droplets, FlaskConical, Leaf, Locate, MapPin, Save, Sprout } from "lucide-react";
+import { Bell, CheckCircle2, ChevronDown, Droplets, FlaskConical, Leaf, Locate, MapPin, Save, Sprout } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { CropCombobox } from "../CropCombobox";
 import { getMe, updateFarm, type FarmData } from "../../../services/api";
+
+const SOIL_TYPES = [
+  "Alluvial Soil",
+  "Black Cotton Soil (Regur)",
+  "Red Laterite Soil",
+  "Red and Yellow Soil",
+  "Laterite Soil",
+  "Arid / Desert Soil",
+  "Saline and Alkaline Soil",
+  "Peaty / Marshy Soil",
+  "Forest / Mountain Soil",
+  "Clay Loam",
+  "Sandy Loam",
+  "Sandy Soil",
+  "Loamy Soil",
+  "Silty Loam",
+  "Silty Soil",
+  "Clay Soil",
+  "Chalky Soil",
+  "Peaty Soil",
+];
 
 // ── Farm Profile card ─────────────────────────────────────────────────────
 function FarmProfileCard() {
@@ -120,14 +141,20 @@ function FarmProfileCard() {
           <label className="farm-profile-label" htmlFor="settings-soil">
             <Sprout className="h-3.5 w-3.5" /> Soil type
           </label>
-          <input
-            id="settings-soil"
-            className="farm-profile-input"
-            type="text"
-            placeholder="e.g. Red Laterite, Black Cotton…"
-            value={soilType}
-            onChange={(e) => setSoilType(e.target.value)}
-          />
+          <div className="farm-select-wrap">
+            <select
+              id="settings-soil"
+              className="farm-profile-select"
+              value={soilType}
+              onChange={(e) => setSoilType(e.target.value)}
+            >
+              <option value="">— Select soil type —</option>
+              {SOIL_TYPES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <ChevronDown className="farm-select-chevron" />
+          </div>
         </div>
 
         {/* Location */}
