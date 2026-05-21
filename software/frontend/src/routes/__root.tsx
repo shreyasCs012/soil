@@ -138,7 +138,7 @@ function RootComponent() {
       <header className="top-nav">
         <Link to="/" className="brand-mark" aria-label="Smart Agro dashboard home">
           <span className="brand-icon">
-            <Sprout className="h-4 w-4" />
+            <Sprout className="h-4 w-4" aria-hidden="true" />
           </span>
           <span>
             <strong>Smart Agro</strong>
@@ -173,7 +173,7 @@ function RootComponent() {
               aria-label="Sign out"
               title="Sign out"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         )}
