@@ -59,7 +59,9 @@ export function SoilPredictionPanel() {
               ? (latest.farm as { id?: string | number }).id ?? String(latest.farm)
               : String(latest.farm);
           }
-        } catch { /* backend will scope by JWT */ }
+         } catch (err) {
+           console.warn("Could not resolve farm ID; relying on JWT scope:", err instanceof Error ? err.message : String(err));
+         }
 
         const pred = await getSoilPrediction(farmId);
         if (mounted) setPrediction(pred);
