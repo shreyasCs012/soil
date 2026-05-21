@@ -9,6 +9,12 @@ from .views import (
     DashboardView,
     AlertsView,
 )
+from .irrigation_views import (
+    CompartmentsView,
+    ComputeMixView,
+    TrendAlertsView,
+    TriggerIrrigationView,
+)
 
 urlpatterns = [
     path('farms/', FarmListCreateView.as_view(), name='farm-list-create'),
@@ -18,4 +24,8 @@ urlpatterns = [
     path('sensor-data/history/', SensorDataHistoryView.as_view(), name='sensor-data-history'),
     path('dashboard/', DashboardView.as_view(), name='dashboard'),
     path('alerts/', AlertsView.as_view(), name='alerts'),
+    path('irrigation/compartments/', CompartmentsView.as_view(), name='irrigation-compartments'),
+    path('irrigation/compute-mix/', ComputeMixView.as_view(), name='irrigation-compute-mix'),
+    path('irrigation/trend-alerts/', TrendAlertsView.as_view(), name='irrigation-trend-alerts'),
+    path('irrigation/trigger/', TriggerIrrigationView.as_view(), name='irrigation-trigger'),
 ]

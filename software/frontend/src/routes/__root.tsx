@@ -7,9 +7,9 @@ import {
   useNavigate,
   useRouterState,
 } from "@tanstack/react-router";
-import { Bell, Gauge, LogOut, RadioTower, Settings, Sprout } from "lucide-react";
+import { Bell, Droplets, Gauge, LogOut, RadioTower, Settings, Sprout } from "lucide-react";
 import { useEffect, useState } from "react";
-import { getMe, isAuthenticated, logout, type UserData } from "../services/api";
+import { logout, tryRestoreSession, type UserData } from "../services/api";
 
 import appCss from "../styles.css?url";
 
@@ -82,23 +82,25 @@ function RootComponent() {
       return;
     }
 
-    if (!isAuthenticated()) {
-      navigate({ to: "/login", replace: true });
-      setChecked(true);
-      return;
-    }
+    let cancelled = false;
 
-    // Fetch user info for the nav bar (token might still be present but expired)
-    getMe()
-      .then((data) => {
-        setUser(data);
+    (async () => {
+      const restoredUser = await tryRestoreSession();
+      if (cancelled) return;
+
+      if (!restoredUser) {
+        navigate({ to: "/login", replace: true });
         setChecked(true);
-      })
-      .catch(() => {
-        // Token expired or invalid — clear and redirect
-        logout().then(() => navigate({ to: "/login", replace: true }));
-        setChecked(true);
-      });
+        return;
+      }
+
+      setUser(restoredUser);
+      setChecked(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
@@ -109,10 +111,11 @@ function RootComponent() {
   if (isAuthRoute) return <Outlet />;
 
   const navItems = [
-    { to: "/" as const,         label: "Dashboard", icon: Gauge },
-    { to: "/sensors" as const,  label: "Sensors",   icon: RadioTower },
-    { to: "/alerts" as const,   label: "Alerts",    icon: Bell },
-    { to: "/settings" as const, label: "Settings",  icon: Settings },
+    { to: "/" as const,           label: "Dashboard",  icon: Gauge },
+    { to: "/sensors" as const,    label: "Sensors",    icon: RadioTower },
+    { to: "/alerts" as const,     label: "Alerts",     icon: Bell },
+    { to: "/irrigation" as const, label: "Irrigation", icon: Droplets },
+    { to: "/settings" as const,   label: "Settings",   icon: Settings },
   ];
 
   const farmName = user?.farms?.[0]?.name ?? "My Farm";

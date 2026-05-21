@@ -1,10 +1,12 @@
-import { Activity, Droplets, FlaskConical, Leaf, Sprout, Zap } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import { Activity, CheckCircle2, Droplets, FlaskConical, Leaf, Save, Sprout, Zap } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
 import { AiRecommendationPanel } from "../AiRecommendationPanel";
 import { MetricCard } from "../MetricCard";
 import { TrendChart } from "../TrendChart";
 import { WeatherWidget } from "../WeatherWidget";
-import { getDashboard } from "../../../services/api";
+import { CropCombobox } from "../CropCombobox";
+import { getDashboard, getMe, updateFarm } from "../../../services/api";
+import type { FarmData } from "../../../services/api";
 
 const icons = {
   moisture: Droplets,
@@ -14,9 +16,37 @@ const icons = {
   potassium: Zap,
 };
 
+const SOIL_TYPES = [
+  "Alluvial Soil",
+  "Black Cotton Soil (Regur)",
+  "Red Laterite Soil",
+  "Red and Yellow Soil",
+  "Laterite Soil",
+  "Arid / Desert Soil",
+  "Saline and Alkaline Soil",
+  "Peaty / Marshy Soil",
+  "Forest / Mountain Soil",
+  "Clay Loam",
+  "Sandy Loam",
+  "Sandy Soil",
+  "Loamy Soil",
+  "Silty Loam",
+  "Silty Soil",
+  "Clay Soil",
+  "Chalky Soil",
+  "Peaty Soil",
+];
+
 export function DashboardPage() {
   const [metrics, setMetrics] = useState<any[]>([]);
   const [trend, setTrend] = useState<any[]>([]);
+  const [farm, setFarm] = useState<FarmData | null>(null);
+  const [cropType, setCropType] = useState("");
+  const [soilType, setSoilType] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -35,10 +65,41 @@ export function DashboardPage() {
         }
       });
 
+    getMe()
+      .then((user) => {
+        if (!mounted) return;
+        const f = user.farms?.[0];
+        if (!f) return;
+        setFarm(f);
+        setCropType(f.crop_type ?? "");
+        setSoilType(f.soil_type ?? "");
+      })
+      .catch(() => {});
+
     return () => {
       mounted = false;
     };
   }, []);
+
+  async function handleSaveFarm() {
+    if (!farm) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await updateFarm(farm.id, {
+        crop_type: cropType,
+        soil_type: soilType,
+      });
+      setFarm({ ...farm, ...updated });
+      setSaved(true);
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+      savedTimer.current = setTimeout(() => setSaved(false), 3000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Save failed.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="page-stack">
@@ -72,7 +133,68 @@ export function DashboardPage() {
         )}
       </section>
 
+      {farm && (
+        <section className="content-grid">
+          <div className="agro-card">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Farm settings</p>
+                <h2>Crop & Soil type</h2>
+              </div>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div className="farm-profile-field">
+                <label className="farm-profile-label">
+                  <Leaf className="h-3.5 w-3.5" /> Crop type
+                </label>
+                <CropCombobox
+                  id="dashboard-crop"
+                  value={cropType}
+                  onChange={setCropType}
+                />
+              </div>
+
+              <div className="farm-profile-field">
+                <label className="farm-profile-label" htmlFor="dashboard-soil">
+                  <Sprout className="h-3.5 w-3.5" /> Soil type
+                </label>
+                <select
+                  id="dashboard-soil"
+                  className="farm-profile-input"
+                  value={soilType}
+                  onChange={(e) => setSoilType(e.target.value)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <option value="">Select soil type...</option>
+                  {SOIL_TYPES.map((type) => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {error && <p className="auth-error" role="alert" style={{ marginBottom: '1rem' }}>{error}</p>}
+
+            <button
+              className="farm-save-btn"
+              onClick={handleSaveFarm}
+              disabled={saving}
+              style={{ width: '100%' }}
+            >
+              {saved
+                ? <><CheckCircle2 className="h-4 w-4" /> Saved!</>
+                : saving
+                  ? <><span className="auth-spinner" /> Saving…</>
+                  : <><Save className="h-4 w-4" /> Save changes</>
+              }
+            </button>
+          </div>
+        </section>
+      )}
+
       <section className="content-grid">
+            <AiRecommendationPanel />
         <div className="agro-card lg:col-span-2">
           <div className="section-heading">
             <div>
@@ -87,7 +209,7 @@ export function DashboardPage() {
       </section>
 
       <section className="content-grid">
-        <AiRecommendationPanel />
+    
       </section>
     </div>
   );

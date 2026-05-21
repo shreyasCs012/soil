@@ -1,7 +1,7 @@
 import { Eye, EyeOff, Leaf, Lock, User } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "@tanstack/react-router";
-import { login } from "../../../services/api";
+import { login, tryRestoreSession } from "../../../services/api";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -10,6 +10,24 @@ export function LoginPage() {
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [checkingStoredSession, setCheckingStoredSession] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const user = await tryRestoreSession();
+      if (!cancelled && user) {
+        navigate({ to: "/", replace: true });
+        return;
+      }
+      if (!cancelled) setCheckingStoredSession(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -122,9 +140,9 @@ export function LoginPage() {
 
             {error && <p className="auth-error" role="alert">{error}</p>}
 
-            <button type="submit" className="auth-submit" disabled={loading}>
-              {loading ? <span className="auth-spinner" /> : null}
-              {loading ? "Signing in…" : "Sign in"}
+            <button type="submit" className="auth-submit" disabled={loading || checkingStoredSession}>
+              {loading || checkingStoredSession ? <span className="auth-spinner" /> : null}
+              {checkingStoredSession ? "Checking saved session…" : loading ? "Signing in…" : "Sign in"}
             </button>
           </form>
 
