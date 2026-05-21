@@ -65,7 +65,8 @@ function RootShell({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        {children}
+          <a href="#main" className="skip-link">Skip to content</a>
+          {children}
         <Scripts />
       </body>
     </html>
@@ -178,7 +179,7 @@ function RootComponent() {
         )}
       </header>
 
-      <main className="app-main">
+      <main id="main" className="app-main">
         <Outlet />
       </main>
     </div>
