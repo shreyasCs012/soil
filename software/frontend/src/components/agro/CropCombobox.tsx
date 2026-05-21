@@ -66,6 +66,8 @@ export function CropCombobox({ value, onChange, id, required }: CropComboboxProp
   }, [value]);
 
   useEffect(() => {
+    if (!open) return;
+    
     function handleOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
@@ -74,7 +76,7 @@ export function CropCombobox({ value, onChange, id, required }: CropComboboxProp
     }
     document.addEventListener("mousedown", handleOutside);
     return () => document.removeEventListener("mousedown", handleOutside);
-  }, [query, value]);
+  }, [open, query, value]);
 
   function select(crop: string) {
     onChange(crop);
