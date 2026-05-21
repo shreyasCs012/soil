@@ -16,24 +16,6 @@ int relayPin = 7;
 // Soil threshold
 int dryThreshold = 700;
 
-void setup() {#include <SoftwareSerial.h>
-#include <DHT.h>
-
-#define DHTPIN 2
-#define DHTTYPE DHT11
-
-DHT dht(DHTPIN, DHTTYPE);
-
-// Bluetooth
-SoftwareSerial BT(10, 11);
-
-// Pins
-int soilPin = A0;
-int relayPin = 7;
-
-// Soil threshold
-int dryThreshold = 700;
-
 void setup() {
 
   Serial.begin(9600);
@@ -47,7 +29,10 @@ void setup() {
   // Pump OFF initially
   digitalWrite(relayPin, HIGH);
 
-  Serial.println("Smart Agro System Started");
+  Serial.println();
+  Serial.println("====================================");
+  Serial.println("   SMART AGRO SYSTEM STARTED");
+  Serial.println("====================================");
 }
 
 void loop() {
@@ -60,140 +45,76 @@ void loop() {
   float hum = dht.readHumidity();
 
   // =========================
-  // DISPLAY DATA
+  // HEADER
   // =========================
 
-  Serial.print("Soil moisture:");
-  Serial.print(soilValue);
+  Serial.println();
+  Serial.println("====================================");
 
-  Serial.print(" Temperature:");
+  // =========================
+  // SENSOR VALUES
+  // =========================
+
+  Serial.print("Soil Moisture : ");
+  Serial.println(soilValue);
+
+  Serial.print("Temperature   : ");
   Serial.print(temp);
+  Serial.println(" C");
 
-  Serial.print(" Humidity:");
-  Serial.println(hum);
-
-  BT.print("Soil moisture:");
-  BT.print(soilValue);
-
-  BT.print(" Temperature:");
-  BT.print(temp);
-
-  BT.print(" Humidity:");
-  BT.println(hum);
+  Serial.print("Humidity      : ");
+  Serial.print(hum);
+  Serial.println(" %");
 
   // =========================
-  // SMART IRRIGATION
+  // SOIL STATUS
   // =========================
 
-  while (soilValue > dryThreshold) {
+  if (soilValue > dryThreshold) {
 
-    Serial.println("Soil Dry -> Pump ON");
+    Serial.println();
+    Serial.println("STATUS : DRY SOIL");
+
+    Serial.println("PUMP   : ON");
 
     // Pump ON
     digitalWrite(relayPin, LOW);
 
-    // Water for 5 seconds
     delay(5000);
 
     // Pump OFF
     digitalWrite(relayPin, HIGH);
 
-    Serial.println("Pump OFF");
+    Serial.println("PUMP   : OFF");
 
-    // Wait 10 seconds
     Serial.println("Waiting 10 seconds...");
 
     delay(10000);
 
-    // Check soil again
-    soilValue = analogRead(soilPin);
+  } else {
 
-    Serial.print("New Soil Value: ");
-    Serial.println(soilValue);
+    Serial.println();
+    Serial.println("STATUS : WET SOIL");
+
+    Serial.println("PUMP   : OFF");
+
+    digitalWrite(relayPin, HIGH);
+
+    delay(3000);
   }
 
-  Serial.println("Soil Wet -> No Water Needed");
-
-  delay(3000);
-}
-
-  Serial.begin(9600);
-
-  BT.begin(9600);
-
-  dht.begin();
-
-  pinMode(relayPin, OUTPUT);
-
-  // Pump OFF initially
-  digitalWrite(relayPin, HIGH);
-
-  Serial.println("Smart Agro System Started");
-}
-
-void loop() {
-
-  // Read sensors
-  int soilValue = analogRead(soilPin);
-
-  float temp = dht.readTemperature();
-
-  float hum = dht.readHumidity();
+  Serial.println("====================================");
 
   // =========================
-  // DISPLAY DATA
+  // BLUETOOTH OUTPUT
   // =========================
 
-  Serial.print("Soil moisture:");
-  Serial.print(soilValue);
-
-  Serial.print(" Temperature:");
-  Serial.print(temp);
-
-  Serial.print(" Humidity:");
-  Serial.println(hum);
-
-  BT.print("Soil moisture:");
+  BT.print("Soil:");
   BT.print(soilValue);
 
-  BT.print(" Temperature:");
+  BT.print(" Temp:");
   BT.print(temp);
 
   BT.print(" Humidity:");
   BT.println(hum);
-
-  // =========================
-  // SMART IRRIGATION
-  // =========================
-
-  while (soilValue > dryThreshold) {
-
-    Serial.println("Soil Dry -> Pump ON");
-
-    // Pump ON
-    digitalWrite(relayPin, LOW);
-
-    // Water for 5 seconds
-    delay(5000);
-
-    // Pump OFF
-    digitalWrite(relayPin, HIGH);
-
-    Serial.println("Pump OFF");
-
-    // Wait 10 seconds
-    Serial.println("Waiting 10 seconds...");
-
-    delay(10000);
-
-    // Check soil again
-    soilValue = analogRead(soilPin);
-
-    Serial.print("New Soil Value: ");
-    Serial.println(soilValue);
-  }
-
-  Serial.println("Soil Wet -> No Water Needed");
-
-  delay(3000);
 }
