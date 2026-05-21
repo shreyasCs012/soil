@@ -315,6 +315,12 @@
     font-weight: 800;
   }
 
+  /* Brand hover state for clearer affordance */
+  .brand-mark:hover {
+    color: color-mix(in oklab, var(--primary) 55%, var(--foreground));
+    text-decoration: none;
+  }
+
   .brand-icon {
     display: grid;
     height: 2.5rem;
@@ -354,6 +360,24 @@
   .nav-link-active {
     background: var(--primary);
     color: var(--primary-foreground);
+  }
+
+  .nav-logout {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: transparent;
+    border: none;
+    padding: 0.45rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 140ms ease, transform 140ms ease;
+  }
+
+  .nav-logout:hover,
+  .nav-logout:focus-visible {
+    background: color-mix(in oklab, var(--primary) 10%, transparent);
+    transform: translateY(-1px);
   }
 
   .app-main {
