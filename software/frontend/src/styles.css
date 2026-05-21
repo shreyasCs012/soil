@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap');
+
 @import "tailwindcss";
 @source "../src";
 @import "tw-animate-css";
@@ -184,7 +186,8 @@
 }
 
 @theme inline {
-  --font-sans: "Aptos", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Inter", "Poppins", system-ui, sans-serif;
+  --font-display: "Poppins", system-ui, sans-serif;
   --color-low: var(--low);
   --color-low-foreground: var(--low-foreground);
   --color-normal: var(--normal);
@@ -260,6 +263,30 @@
     font-family: var(--font-sans);
     min-width: 320px;
     background-image: linear-gradient(180deg, color-mix(in oklab, var(--secondary) 52%, transparent), transparent 38rem);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  h1 {
+    font-size: 2.5rem;
+    line-height: 1.1;
+    font-weight: 800;
+  }
+
+  h2 {
+    font-size: 2rem;
+    line-height: 1.2;
+    font-weight: 800;
+  }
+
+  h3 {
+    font-size: 1.5rem;
+    line-height: 1.25;
+    font-weight: 700;
   }
 
   button,
