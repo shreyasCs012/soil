@@ -33,7 +33,12 @@ export function LoginPage() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    try {
+     if (!username.trim() || !password.trim()) {
+       setError("Please enter both username and password.");
+       setLoading(false);
+       return;
+     }
+     try {
       const ok = await login({ username, password });
       if (ok) {
         navigate({ to: "/" });
