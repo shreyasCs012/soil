@@ -31,8 +31,8 @@ async function fetchWeather(): Promise<WeatherResult> {
   // 2. Farm's stored location
   try {
     const user = await getMe();
-    const farm = user.farms?.[0] as any;
-    if (farm?.latitude && farm?.longitude) {
+    const farm = user.farms?.[0];
+    if (farm && farm.latitude && farm.longitude) {
       const data = await getWeatherByCoords(farm.latitude, farm.longitude);
       return { data, source: "farm" };
     }
