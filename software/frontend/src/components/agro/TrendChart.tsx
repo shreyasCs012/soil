@@ -33,6 +33,29 @@ export function TrendChart({ data, metrics }: { data: TrendPoint[]; metrics: Cha
           ))}
         </LineChart>
       </ResponsiveContainer>
-    </div>
+     {/* Accessibility: Data table for screen readers */}
+     <div className="sr-only" role="region" aria-label="Chart data table for accessibility">
+       <table>
+         <thead>
+           <tr>
+             <th>Time</th>
+             {metrics.map((metric) => (
+               <th key={metric}>{metric.charAt(0).toUpperCase() + metric.slice(1)}</th>
+             ))}
+           </tr>
+         </thead>
+         <tbody>
+           {data.map((point, idx) => (
+             <tr key={idx}>
+               <td>{point.time}</td>
+               {metrics.map((metric) => (
+                 <td key={metric}>{point[metric].toFixed(2)}</td>
+               ))}
+             </tr>
+           ))}
+         </tbody>
+       </table>
+     </div>
+     </div>
   );
 }
