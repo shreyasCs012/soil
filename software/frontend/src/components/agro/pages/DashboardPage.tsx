@@ -56,12 +56,13 @@ export function DashboardPage() {
         if (!mounted) return;
         setMetrics(data.metrics || []);
         setTrend(data.trend || []);
+        setError(null);
       })
       .catch((err: unknown) => {
-        if (err instanceof Error) {
-          console.error('Failed to load dashboard data:', err);
-        } else {
-          console.error('Failed to load dashboard data:', String(err));
+        if (mounted) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          console.error('Failed to load dashboard data:', errorMessage);
+          setError(errorMessage);
         }
       });
 
@@ -103,6 +104,12 @@ export function DashboardPage() {
 
   return (
     <div className="page-stack">
+      {error && (
+        <div className="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive-foreground">
+          <p className="font-medium">Failed to load dashboard data</p>
+          <p className="text-sm">{error}</p>
+        </div>
+      )}
       <section className="hero-band">
         <div>
           <p className="eyebrow">Live field intelligence</p>
