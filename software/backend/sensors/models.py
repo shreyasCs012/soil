@@ -14,6 +14,18 @@ class Farm(models.Model):
     longitude = models.FloatField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # ── Alert thresholds (per-farm, editable from Settings) ───────────────
+    humidity_threshold    = models.FloatField(default=75.0,
+        help_text="Humidity % above which the water pump alert fires.")
+    temperature_threshold = models.FloatField(default=35.0,
+        help_text="Temperature °C above which the water pump alert fires.")
+    moisture_threshold    = models.FloatField(default=35.0,
+        help_text="Soil moisture % below which a low-moisture alert fires.")
+    ph_min = models.FloatField(default=6.2,
+        help_text="pH below this value triggers a pH-drift alert.")
+    ph_max = models.FloatField(default=7.4,
+        help_text="pH above this value triggers a pH-drift alert.")
+
     def __str__(self) -> str:
         return f'{self.name} ({self.user.username})'
 

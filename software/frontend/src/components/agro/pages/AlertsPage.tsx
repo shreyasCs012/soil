@@ -1,11 +1,11 @@
 import { AlertTriangle, CheckCircle2, Droplets, Thermometer } from "lucide-react";
 import { useEffect, useState } from "react";
-import { getAlerts, getLatestSensorData } from "../../../services/api";
+import { getAlerts, getLatestSensorData, getMe } from "../../../services/api";
 
 const THRESHOLD_KEY = "agro_thresholds";
-const DEFAULT_THRESHOLDS = { moisture: 35, ph: 6.2, humidity: 75, temperature: 35 };
+const DEFAULT_THRESHOLDS = { moisture: 35, ph_min: 6.2, ph_max: 7.4, humidity: 75, temperature: 35 };
 
-function readThresholds() {
+function readLocalThresholds() {
   try {
     const raw = localStorage.getItem(THRESHOLD_KEY);
     if (raw) return { ...DEFAULT_THRESHOLDS, ...JSON.parse(raw) };
@@ -23,15 +23,26 @@ export function AlertsPage() {
 
     async function load() {
       try {
-        // Fetch backend alerts + latest sensor reading in parallel
-        const [backendAlerts, sensorRows] = await Promise.all([
+        // Fetch backend alerts, latest sensor reading, and farm thresholds in parallel
+        const [backendAlerts, sensorRows, user] = await Promise.all([
           getAlerts(),
           getLatestSensorData(),
+          getMe(),
         ]);
 
         if (!mounted) return;
 
-        const thresholds = readThresholds();
+        // Prefer DB thresholds; fall back to localStorage if API fails
+        const farm = user?.farms?.[0];
+        const thresholds = farm
+          ? {
+              moisture:    farm.moisture_threshold    ?? DEFAULT_THRESHOLDS.moisture,
+              ph_min:      farm.ph_min               ?? DEFAULT_THRESHOLDS.ph_min,
+              ph_max:      farm.ph_max               ?? DEFAULT_THRESHOLDS.ph_max,
+              humidity:    farm.humidity_threshold    ?? DEFAULT_THRESHOLDS.humidity,
+              temperature: farm.temperature_threshold ?? DEFAULT_THRESHOLDS.temperature,
+            }
+          : readLocalThresholds();
         const extra: any[] = [];
 
         if (sensorRows && sensorRows.length > 0) {

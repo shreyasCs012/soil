@@ -6,7 +6,13 @@ from .models import Farm, SensorData
 class FarmSerializer(serializers.ModelSerializer):
     class Meta:
         model = Farm
-        fields = ['id', 'name', 'location', 'area_acres', 'created_at']
+        fields = [
+            'id', 'name', 'location', 'address', 'area_acres',
+            'crop_type', 'soil_type', 'latitude', 'longitude',
+            'humidity_threshold', 'temperature_threshold',
+            'moisture_threshold', 'ph_min', 'ph_max',
+            'created_at',
+        ]
         read_only_fields = ['id', 'created_at']
 
 

@@ -353,6 +353,12 @@ export interface FarmData {
   soil_type: string;
   latitude?: number | null;
   longitude?: number | null;
+  // Alert thresholds (stored in DB, editable from Settings)
+  humidity_threshold: number;
+  temperature_threshold: number;
+  moisture_threshold: number;
+  ph_min: number;
+  ph_max: number;
   created_at: string;
 }
 
@@ -370,7 +376,10 @@ export async function createFarm(name: string): Promise<FarmData> {
 
 export async function updateFarm(
   farmId: number,
-  data: Partial<Pick<FarmData, 'crop_type' | 'soil_type' | 'location' | 'latitude' | 'longitude' | 'name'>>,
+  data: Partial<Pick<FarmData,
+    | 'crop_type' | 'soil_type' | 'location' | 'latitude' | 'longitude' | 'name'
+    | 'humidity_threshold' | 'temperature_threshold' | 'moisture_threshold' | 'ph_min' | 'ph_max'
+  >>,
 ): Promise<FarmData> {
   return apiCall<FarmData>(`/farms/${farmId}/`, {
     method: 'PATCH',

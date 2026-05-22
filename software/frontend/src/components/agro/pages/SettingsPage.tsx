@@ -231,31 +231,65 @@ function ThresholdControl({ icon: Icon, label, unit, value, min, max, step = 1, 
 }
 
 const THRESHOLD_KEY = "agro_thresholds";
+const DEFAULT_THRESHOLDS = { moisture: 35, ph_min: 6.2, ph_max: 7.4, humidity: 75, temperature: 35 };
 
-function loadThresholds() {
-  try {
-    const raw = localStorage.getItem(THRESHOLD_KEY);
-    if (raw) return { ...defaultThresholds, ...JSON.parse(raw) };
-  } catch { /* ignore */ }
-  return defaultThresholds;
+type Thresholds = typeof DEFAULT_THRESHOLDS;
+
+function farmToThresholds(farm: import("../../../services/api").FarmData): Thresholds {
+  return {
+    moisture:    farm.moisture_threshold    ?? DEFAULT_THRESHOLDS.moisture,
+    ph_min:      farm.ph_min               ?? DEFAULT_THRESHOLDS.ph_min,
+    ph_max:      farm.ph_max               ?? DEFAULT_THRESHOLDS.ph_max,
+    humidity:    farm.humidity_threshold    ?? DEFAULT_THRESHOLDS.humidity,
+    temperature: farm.temperature_threshold ?? DEFAULT_THRESHOLDS.temperature,
+  };
 }
-
-const defaultThresholds = { moisture: 35, ph: 6.2, humidity: 75, temperature: 35 };
 
 // ── Page ──────────────────────────────────────────────────────────────────
 export function SettingsPage() {
   const [notifications, setNotifications] = useState(true);
   const [irrigationOn, setIrrigationOn]   = useState(false);
-  const [thresholds, setThresholds]       = useState(loadThresholds);
+  const [thresholds, setThresholds]       = useState<Thresholds>(DEFAULT_THRESHOLDS);
+  const [farmId, setFarmId]               = useState<number | null>(null);
+  const [savingThresh, setSavingThresh]   = useState(false);
+  const [threshSaved, setThreshSaved]     = useState(false);
 
-  // Persist thresholds to localStorage whenever they change
+  // Load thresholds from DB on mount
   useEffect(() => {
-    localStorage.setItem(THRESHOLD_KEY, JSON.stringify(thresholds));
-  }, [thresholds]);
+    getMe().then((user) => {
+      const f = user.farms?.[0];
+      if (!f) return;
+      setFarmId(f.id);
+      const t = farmToThresholds(f);
+      setThresholds(t);
+      // Mirror to localStorage so AlertsPage can read without an extra API call
+      localStorage.setItem(THRESHOLD_KEY, JSON.stringify(t));
+    }).catch(() => {});
+  }, []);
+
+  // Save thresholds to DB (and mirror to localStorage)
+  async function saveThresholds() {
+    if (!farmId) return;
+    setSavingThresh(true);
+    try {
+      await updateFarm(farmId, {
+        moisture_threshold:    thresholds.moisture,
+        humidity_threshold:    thresholds.humidity,
+        temperature_threshold: thresholds.temperature,
+        ph_min:                thresholds.ph_min,
+        ph_max:                thresholds.ph_max,
+      });
+      localStorage.setItem(THRESHOLD_KEY, JSON.stringify(thresholds));
+      setThreshSaved(true);
+      setTimeout(() => setThreshSaved(false), 3000);
+    } catch { /* ignore */ } finally {
+      setSavingThresh(false);
+    }
+  }
 
   const pumpActive =
     irrigationOn ||
-    thresholds.humidity > 75 ||   // visual hint when settings exceed typical range
+    thresholds.humidity > 75 ||
     thresholds.temperature > 35;
 
   return (
@@ -318,24 +352,38 @@ export function SettingsPage() {
         </div>
         <div className="threshold-grid">
           <ThresholdControl
-            icon={Droplets}     label="Soil Moisture"  unit="%" value={thresholds.moisture}
+            icon={Droplets}     label="Soil Moisture (min)" unit="%" value={thresholds.moisture}
             onChange={(v) => setThresholds((p) => ({ ...p, moisture: v }))}    min={15} max={70} />
           <ThresholdControl
-            icon={FlaskConical} label="pH"             unit="pH" value={thresholds.ph}
-            onChange={(v) => setThresholds((p) => ({ ...p, ph: v }))}          min={4}  max={8}  step={0.1} />
+            icon={FlaskConical} label="pH min"         unit="pH" value={thresholds.ph_min}
+            onChange={(v) => setThresholds((p) => ({ ...p, ph_min: v }))}      min={4}  max={7}  step={0.1} />
           <ThresholdControl
-            icon={Droplets}     label="Humidity"       unit="%" value={thresholds.humidity}
+            icon={FlaskConical} label="pH max"         unit="pH" value={thresholds.ph_max}
+            onChange={(v) => setThresholds((p) => ({ ...p, ph_max: v }))}      min={6}  max={9}  step={0.1} />
+          <ThresholdControl
+            icon={Droplets}     label="Humidity (max)" unit="%" value={thresholds.humidity}
             onChange={(v) => setThresholds((p) => ({ ...p, humidity: v }))}    min={40} max={100} />
           <ThresholdControl
-            icon={Thermometer}  label="Temperature"    unit="°C" value={thresholds.temperature}
+            icon={Thermometer}  label="Temperature (max)" unit="°C" value={thresholds.temperature}
             onChange={(v) => setThresholds((p) => ({ ...p, temperature: v }))} min={20} max={50} />
         </div>
-        {(thresholds.humidity <= 100 || thresholds.temperature <= 50) && (
-          <p className="mt-4 text-sm text-muted-foreground">
-            💧 When humidity exceeds <strong>{thresholds.humidity}%</strong> or temperature exceeds{" "}
-            <strong>{thresholds.temperature}°C</strong>, the water pump activates automatically and an alert is raised.
-          </p>
-        )}
+        <p className="mt-4 text-sm text-muted-foreground">
+          💧 Water pump activates when humidity exceeds <strong>{thresholds.humidity}%</strong> or
+          temperature exceeds <strong>{thresholds.temperature}°C</strong>. pH alert fires outside{" "}
+          <strong>{thresholds.ph_min}–{thresholds.ph_max}</strong>.
+        </p>
+        <button
+          className="farm-save-btn mt-4"
+          onClick={saveThresholds}
+          disabled={savingThresh || !farmId}
+          style={{ width: "100%" }}
+        >
+          {threshSaved
+            ? <><CheckCircle2 className="h-4 w-4" /> Thresholds saved to database!</>
+            : savingThresh
+              ? <><span className="auth-spinner" /> Saving…</>
+              : <><Save className="h-4 w-4" /> Save thresholds</>}
+        </button>
       </section>
     </div>
   );

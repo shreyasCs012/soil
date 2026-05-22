@@ -244,7 +244,10 @@ class FarmUpdateView(APIView):
         except Farm.DoesNotExist:
             return JsonResponse({'detail': 'Farm not found.'}, status=404)
 
-        allowed = ('crop_type', 'soil_type', 'location', 'address', 'latitude', 'longitude', 'name')
+        allowed = (
+            'crop_type', 'soil_type', 'location', 'address', 'latitude', 'longitude', 'name',
+            'humidity_threshold', 'temperature_threshold', 'moisture_threshold', 'ph_min', 'ph_max',
+        )
         updated = {}
         for field in allowed:
             if field in request.data:
@@ -345,6 +348,17 @@ class LatestSensorDataView(generics.ListAPIView):
         return super().list(request, *args, **kwargs)
 
 
+def _farm_thresholds(farm):
+    """Return threshold dict from a Farm ORM object (uses DB values with safe defaults)."""
+    return {
+        'humidity':    getattr(farm, 'humidity_threshold',    HUMIDITY_THRESHOLD),
+        'temperature': getattr(farm, 'temperature_threshold', TEMPERATURE_THRESHOLD),
+        'moisture':    getattr(farm, 'moisture_threshold',    MOISTURE_THRESHOLD),
+        'ph_min':      getattr(farm, 'ph_min',                PH_MIN),
+        'ph_max':      getattr(farm, 'ph_max',                PH_MAX),
+    }
+
+
 class AlertsView(APIView):
     permission_classes = [AllowAny]
 
@@ -356,9 +370,22 @@ class AlertsView(APIView):
 
         if mongo_docs:
             latest_reading = mongo_docs[0]
-            zone = _mongo_farm_key(latest_reading)
+            zone      = _mongo_farm_key(latest_reading)
             timestamp = latest_reading.get('timestamp')
             timestamp = timestamp.strftime('%b %d, %Y %H:%M') if timestamp else ''
+
+            # Try to resolve Farm row for per-farm thresholds
+            raw_farm_id = latest_reading.get('farm_id') or latest_reading.get('farm')
+            farm_obj = None
+            if raw_farm_id:
+                try:
+                    farm_obj = Farm.objects.filter(id=raw_farm_id).first()
+                except Exception:
+                    pass
+            t = _farm_thresholds(farm_obj) if farm_obj else {
+                'humidity': HUMIDITY_THRESHOLD, 'temperature': TEMPERATURE_THRESHOLD,
+                'moisture': MOISTURE_THRESHOLD, 'ph_min': PH_MIN, 'ph_max': PH_MAX,
+            }
 
             alerts = []
             soil_moisture = latest_reading.get('soil_moisture') or 0
@@ -366,8 +393,7 @@ class AlertsView(APIView):
             temperature   = latest_reading.get('temperature') or 0
             ph            = latest_reading.get('ph') or 0
 
-            # Pump-on alert — humidity threshold
-            if humidity > HUMIDITY_THRESHOLD:
+            if humidity > t['humidity']:
                 alerts.append({
                     'id': 'pump-humidity',
                     'priority': 'High',
@@ -375,14 +401,13 @@ class AlertsView(APIView):
                     'title': '💧 Water pump is ON — high humidity',
                     'detail': (
                         f'Humidity on {zone} is {humidity:.1f}% '
-                        f'(threshold {HUMIDITY_THRESHOLD}%). Irrigation pump activated automatically.'
+                        f'(threshold {t["humidity"]}%). Irrigation pump activated automatically.'
                     ),
                     'action': 'Monitor water usage and soil saturation',
                     'zone': zone,
                 })
 
-            # Pump-on alert — temperature threshold
-            if temperature > TEMPERATURE_THRESHOLD:
+            if temperature > t['temperature']:
                 alerts.append({
                     'id': 'pump-temperature',
                     'priority': 'High',
@@ -390,48 +415,47 @@ class AlertsView(APIView):
                     'title': '🌡️ Water pump is ON — high temperature',
                     'detail': (
                         f'Temperature on {zone} is {temperature:.1f}°C '
-                        f'(threshold {TEMPERATURE_THRESHOLD}°C). Irrigation pump activated to cool soil.'
+                        f'(threshold {t["temperature"]}°C). Pump activated to cool soil.'
                     ),
                     'action': 'Check field for heat stress; consider shade netting',
                     'zone': zone,
                 })
 
-            # Low moisture
-            if soil_moisture < MOISTURE_THRESHOLD:
+            if soil_moisture < t['moisture']:
                 alerts.append({
                     'id': 'low-moisture',
                     'priority': 'Medium',
                     'time': timestamp,
                     'title': 'Low soil moisture detected',
-                    'detail': f'Soil moisture on {zone} is {soil_moisture}%, below safe threshold.',
+                    'detail': f'Soil moisture on {zone} is {soil_moisture}%, below threshold ({t["moisture"]}%).',
                     'action': 'Increase irrigation duration',
                     'zone': zone,
                 })
 
-            # pH drift
-            if ph and (ph < PH_MIN or ph > PH_MAX):
+            if ph and (ph < t['ph_min'] or ph > t['ph_max']):
                 alerts.append({
                     'id': 'ph-drift',
                     'priority': 'Medium',
                     'time': timestamp,
                     'title': 'pH level drift detected',
-                    'detail': f'Current pH is {ph:.2f} — ideal range {PH_MIN}–{PH_MAX}.',
+                    'detail': f'Current pH is {ph:.2f} — ideal range {t["ph_min"]}–{t["ph_max"]}.',
                     'action': 'Apply lime (low pH) or sulfur (high pH)',
                     'zone': zone,
                 })
 
             return JsonResponse(alerts or [], safe=False)
 
-        latest_reading = SensorData.objects.order_by('-timestamp').first()
+        latest_reading = SensorData.objects.select_related('farm').order_by('-timestamp').first()
         if not latest_reading:
             return JsonResponse([], safe=False)
 
-        alerts = []
-        zone      = latest_reading.farm.name
+        farm      = latest_reading.farm
+        t         = _farm_thresholds(farm)
+        alerts    = []
+        zone      = farm.name
         timestamp = latest_reading.timestamp.strftime('%b %d, %Y %H:%M')
 
-        # Pump-on alert — humidity
-        if latest_reading.humidity > HUMIDITY_THRESHOLD:
+        if latest_reading.humidity > t['humidity']:
             alerts.append({
                 'id': 'pump-humidity',
                 'priority': 'High',
@@ -439,14 +463,13 @@ class AlertsView(APIView):
                 'title': '💧 Water pump is ON — high humidity',
                 'detail': (
                     f'Humidity on {zone} is {latest_reading.humidity:.1f}% '
-                    f'(threshold {HUMIDITY_THRESHOLD}%). Pump activated automatically.'
+                    f'(threshold {t["humidity"]}%). Pump activated automatically.'
                 ),
                 'action': 'Monitor water usage and soil saturation',
                 'zone': zone,
             })
 
-        # Pump-on alert — temperature
-        if latest_reading.temperature > TEMPERATURE_THRESHOLD:
+        if latest_reading.temperature > t['temperature']:
             alerts.append({
                 'id': 'pump-temperature',
                 'priority': 'High',
@@ -454,32 +477,30 @@ class AlertsView(APIView):
                 'title': '🌡️ Water pump is ON — high temperature',
                 'detail': (
                     f'Temperature on {zone} is {latest_reading.temperature:.1f}°C '
-                    f'(threshold {TEMPERATURE_THRESHOLD}°C). Pump activated to cool soil.'
+                    f'(threshold {t["temperature"]}°C). Pump activated to cool soil.'
                 ),
                 'action': 'Check field for heat stress; consider shade netting',
                 'zone': zone,
             })
 
-        # Low moisture
-        if latest_reading.soil_moisture < MOISTURE_THRESHOLD:
+        if latest_reading.soil_moisture < t['moisture']:
             alerts.append({
                 'id': 'low-moisture',
                 'priority': 'Medium',
                 'time': timestamp,
                 'title': 'Low soil moisture detected',
-                'detail': f'Soil moisture on {zone} is {latest_reading.soil_moisture}%, below safe threshold.',
+                'detail': f'Soil moisture on {zone} is {latest_reading.soil_moisture}%, below threshold ({t["moisture"]}%).',
                 'action': 'Increase irrigation duration',
                 'zone': zone,
             })
 
-        # pH drift
-        if latest_reading.ph < PH_MIN or latest_reading.ph > PH_MAX:
+        if latest_reading.ph < t['ph_min'] or latest_reading.ph > t['ph_max']:
             alerts.append({
                 'id': 'ph-drift',
                 'priority': 'Medium',
                 'time': timestamp,
                 'title': 'pH level drift detected',
-                'detail': f'Current pH is {latest_reading.ph:.2f} — ideal range {PH_MIN}–{PH_MAX}.',
+                'detail': f'Current pH is {latest_reading.ph:.2f} — ideal range {t["ph_min"]}–{t["ph_max"]}.',
                 'action': 'Apply lime (low pH) or sulfur (high pH)',
                 'zone': zone,
             })
