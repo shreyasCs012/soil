@@ -61,7 +61,6 @@ export function DashboardPage() {
       .catch((err: unknown) => {
         if (mounted) {
           const errorMessage = err instanceof Error ? err.message : String(err);
-          console.error('Failed to load dashboard data:', errorMessage);
           setError(errorMessage);
         }
       });
@@ -81,6 +80,12 @@ export function DashboardPage() {
       mounted = false;
     };
   }, []);
+        .catch((err: unknown) => {
+          if (mounted) {
+            const errorMessage = err instanceof Error ? err.message : "Failed to load dashboard data";
+            setError(errorMessage);
+          }
+        });
 
   async function handleSaveFarm() {
     if (!farm) return;
