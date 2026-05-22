@@ -10,6 +10,19 @@ import type { FarmData } from "../../../services/api";
 
 const icons = {
   moisture: Droplets,
+type MetricData = {
+  key: string;
+  label: string;
+  value: number;
+  unit: string;
+  status?: 'low' | 'normal' | 'warning';
+  hint?: string;
+};
+
+type TrendData = {
+  timestamp: string;
+  [key: string]: string | number;
+};
   ph: FlaskConical,
   nitrogen: Leaf,
   phosphorus: Sprout,
@@ -61,7 +74,6 @@ export function DashboardPage() {
       .catch((err: unknown) => {
         if (mounted) {
           const errorMessage = err instanceof Error ? err.message : String(err);
-          console.error('Failed to load dashboard data:', errorMessage);
           setError(errorMessage);
         }
       });
@@ -81,6 +93,12 @@ export function DashboardPage() {
       mounted = false;
     };
   }, []);
+        .catch((err: unknown) => {
+          if (mounted) {
+            const errorMessage = err instanceof Error ? err.message : "Failed to load dashboard data";
+            setError(errorMessage);
+          }
+        });
 
   async function handleSaveFarm() {
     if (!farm) return;
