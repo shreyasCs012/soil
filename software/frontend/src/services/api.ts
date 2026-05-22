@@ -190,10 +190,47 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  // Basic retry logic for transient network errors
+  let attempts = 0;
+  const maxAttempts = 2;
+  let lastErr: unknown = null;
+
+  while (attempts <= maxAttempts) {
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...options,
+        headers,
+      });
+
+      if (response.status === 401) {
+        // Try to refresh token
+        if (refreshToken) {
+          const refreshed = await refreshAccessToken();
+          if (refreshed) {
+            // Retry the original request once more
+            attempts++;
+            continue;
+          }
+        }
+        throw new Error("Unauthorized - Please login again");
+      }
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`API Error: ${response.status} - ${error}`);
+      }
+
+      return response.json();
+    } catch (err) {
+      lastErr = err;
+      // If it's a network error retry once
+      attempts++;
+      if (attempts > maxAttempts) break;
+      await new Promise((r) => setTimeout(r, 300 * attempts));
+    }
+  }
+
+  throw lastErr;
 
   if (response.status === 401) {
     // Try to refresh token
