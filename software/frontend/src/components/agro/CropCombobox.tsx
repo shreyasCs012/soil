@@ -49,9 +49,10 @@ interface CropComboboxProps {
   onChange: (value: string) => void;
   id?: string;
   required?: boolean;
+  disabled?: boolean;
 }
 
-export function CropCombobox({ value, onChange, id, required }: CropComboboxProps) {
+export function CropCombobox({ value, onChange, id, required, disabled = false }: CropComboboxProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(value);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -62,7 +63,7 @@ export function CropCombobox({ value, onChange, id, required }: CropComboboxProp
     : CROPS;
 
   useEffect(() => {
-    setQuery(value);
+    setQuery(value || "");
   }, [value]);
 
   useEffect(() => {
@@ -71,7 +72,7 @@ export function CropCombobox({ value, onChange, id, required }: CropComboboxProp
     function handleOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
-        if (!CROPS.includes(query)) setQuery(value);
+        if (!CROPS.includes(query.trim())) setQuery(value || "");
       }
     }
     document.addEventListener("mousedown", handleOutside);
@@ -79,12 +80,14 @@ export function CropCombobox({ value, onChange, id, required }: CropComboboxProp
   }, [open, query, value]);
 
   function select(crop: string) {
+    if (disabled || !crop) return;
     onChange(crop);
     setQuery(crop);
     setOpen(false);
   }
 
   function clear() {
+    if (disabled) return;
     onChange("");
     setQuery("");
     inputRef.current?.focus();
@@ -103,6 +106,7 @@ export function CropCombobox({ value, onChange, id, required }: CropComboboxProp
           placeholder="Search crop…"
           value={query}
           required={required}
+            disabled={disabled}
           autoComplete="off"
           onChange={(e) => {
             setQuery(e.target.value);
