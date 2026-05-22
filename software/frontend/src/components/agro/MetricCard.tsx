@@ -12,9 +12,19 @@ type MetricCardProps = {
   icon: LucideIcon;
 };
 
+/**
+ * MetricCard component displays a sensor metric with real-time value, status, and unit.
+ * @component
+ * @param {MetricCardProps} props - The component props
+ * @returns {JSX.Element} A card displaying the metric information
+ */
 export function MetricCard({ label, value, unit, status, hint, icon: Icon }: MetricCardProps) {
   return (
-    <article className={`agro-card metric-card metric-${status}`}>
+    <article 
+      className={`agro-card metric-card metric-${status}`}
+      aria-label={`${label}: ${value} ${unit} - Status: ${status}`}
+      role="region"
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="metric-icon" aria-hidden="true">
           <Icon className="h-5 w-5" />
@@ -24,7 +34,12 @@ export function MetricCard({ label, value, unit, status, hint, icon: Icon }: Met
       <div className="mt-6">
         <p className="text-sm font-semibold text-muted-foreground">{label}</p>
         <div className="mt-2 flex items-end gap-2">
-          <strong className="text-4xl font-black tracking-normal text-foreground">{value}</strong>
+          <strong 
+            className="text-4xl font-black tracking-normal text-foreground"
+            aria-label={`Metric value: ${value}`}
+          >
+            {value}
+          </strong>
           <span className="pb-1 text-sm font-bold text-muted-foreground">{unit}</span>
         </div>
         <p className="mt-4 text-sm leading-6 text-muted-foreground">{hint}</p>
