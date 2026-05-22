@@ -1,20 +1,25 @@
-
 import serial
 import requests
-print("Script Started")
-# Bluetooth COM Port
-bluetooth = serial.Serial('COM6', 9600)
-print("Bluetooth Connected")
-# Your teammate backend URL
-url = "http://YOUR_TEAMMATE_IP:8000/api/sensor/"
+import json
+
+# Arduino COM Port
+arduino = serial.Serial('COM5', 9600)
+
+# Backend URL
+url = "http://127.0.0.1:8000/api/"
+
+print("Reading Arduino Data...")
 
 while True:
 
-    raw_data = bluetooth.readline().decode().strip()
-
-    print(raw_data)
-
     try:
+
+        raw_data = arduino.readline().decode().strip()
+
+        print("Received:", raw_data)
+
+        # Example:
+        # Soil:500 Temp:30 Humidity:58
 
         parts = raw_data.split()
 
@@ -35,8 +40,8 @@ while True:
 
         response = requests.post(url, json=data)
 
-        print("Sent")
+        print("Sent:", response.status_code)
 
     except Exception as e:
 
-        print(e)
+        print("Error:", e)
