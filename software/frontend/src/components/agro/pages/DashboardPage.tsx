@@ -58,6 +58,7 @@ export function DashboardPage() {
   const [soilType, setSoilType] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -70,11 +71,13 @@ export function DashboardPage() {
         setMetrics(data.metrics || []);
         setTrend(data.trend || []);
         setError(null);
+          setLoading(false);
       })
       .catch((err: unknown) => {
         if (mounted) {
           const errorMessage = err instanceof Error ? err.message : String(err);
           setError(errorMessage);
+            setLoading(false);
         }
       });
 
