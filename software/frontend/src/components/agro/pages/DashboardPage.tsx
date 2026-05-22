@@ -10,6 +10,19 @@ import type { FarmData } from "../../../services/api";
 
 const icons = {
   moisture: Droplets,
+type MetricData = {
+  key: string;
+  label: string;
+  value: number;
+  unit: string;
+  status?: 'low' | 'normal' | 'warning';
+  hint?: string;
+};
+
+type TrendData = {
+  timestamp: string;
+  [key: string]: string | number;
+};
   ph: FlaskConical,
   nitrogen: Leaf,
   phosphorus: Sprout,
