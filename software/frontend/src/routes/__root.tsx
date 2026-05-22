@@ -65,7 +65,6 @@ function RootShell({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-          <a href="#main" className="skip-link">Skip to content</a>
           {children}
         <Scripts />
       </body>
