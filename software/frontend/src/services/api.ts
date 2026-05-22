@@ -231,25 +231,6 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 
   throw lastErr;
-
-  if (response.status === 401) {
-    // Try to refresh token
-    if (refreshToken) {
-      const refreshed = await refreshAccessToken();
-      if (refreshed) {
-        // Retry the original request
-        return apiCall<T>(endpoint, options);
-      }
-    }
-    throw new Error("Unauthorized - Please login again");
-  }
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`API Error: ${response.status} - ${error}`);
-  }
-
-  return response.json();
 }
 
 // Authentication endpoints

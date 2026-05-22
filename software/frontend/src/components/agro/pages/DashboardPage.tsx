@@ -1,5 +1,5 @@
 import { Activity, CheckCircle2, Droplets, FlaskConical, Leaf, Save, Sprout, Zap } from "lucide-react";
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AiRecommendationPanel } from "../AiRecommendationPanel";
 import { MetricCard } from "../MetricCard";
 import { TrendChart } from "../TrendChart";
@@ -8,14 +8,12 @@ import { CropCombobox } from "../CropCombobox";
 import { getDashboard, getMe, updateFarm } from "../../../services/api";
 import type { FarmData } from "../../../services/api";
 
-const icons = {
-  moisture: Droplets,
 type MetricData = {
   key: string;
   label: string;
   value: number;
   unit: string;
-  status?: 'low' | 'normal' | 'warning';
+  status?: "low" | "normal" | "warning";
   hint?: string;
 };
 
@@ -23,6 +21,9 @@ type TrendData = {
   timestamp: string;
   [key: string]: string | number;
 };
+
+const icons: Record<string, React.ComponentType<any>> = {
+  moisture: Droplets,
   ph: FlaskConical,
   nitrogen: Leaf,
   phosphorus: Sprout,
@@ -51,8 +52,8 @@ const SOIL_TYPES = [
 ];
 
 export function DashboardPage() {
-  const [metrics, setMetrics] = useState<any[]>([]);
-  const [trend, setTrend] = useState<any[]>([]);
+  const [metrics, setMetrics] = useState<MetricData[]>([]);
+  const [trend, setTrend] = useState<TrendData[]>([]);
   const [farm, setFarm] = useState<FarmData | null>(null);
   const [cropType, setCropType] = useState("");
   const [soilType, setSoilType] = useState("");
@@ -69,13 +70,17 @@ export function DashboardPage() {
       .then((data) => {
         if (!mounted) return;
         setMetrics(data.metrics || []);
-        setTrend(data.trend || []);
+        setTrend((data.trend || []).map((point: any) => ({
+          timestamp: point.timestamp || new Date().toISOString(),
+          ...point,
+        })));
         setError(null);
           setLoading(false);
       })
       .catch((err: unknown) => {
         if (mounted) {
-          const errorMessage = err instanceof Error ? err.message : String(err);
+          const errorMessage = err instanceof Error ? err.message : "Failed to load dashboard data";
+          console.error("Failed to load dashboard data:", errorMessage);
           setError(errorMessage);
             setLoading(false);
         }
@@ -96,12 +101,6 @@ export function DashboardPage() {
       mounted = false;
     };
   }, []);
-        .catch((err: unknown) => {
-          if (mounted) {
-            const errorMessage = err instanceof Error ? err.message : "Failed to load dashboard data";
-            setError(errorMessage);
-          }
-        });
 
   async function handleSaveFarm() {
     if (!farm) return;
@@ -131,11 +130,14 @@ export function DashboardPage() {
           <p className="text-sm">{error}</p>
         </div>
       )}
+
       <section className="hero-band">
         <div>
           <p className="eyebrow">Live field intelligence</p>
           <h1>Smart Agro-Advisory System</h1>
-          <p className="hero-copy">Monitor soil, nutrients, weather, and irrigation decisions from one farmer-friendly command center.</p>
+          <p className="hero-copy">
+            Monitor soil, nutrients, weather, and irrigation decisions from one farmer-friendly command center.
+          </p>
         </div>
         <div className="hero-status" aria-label="System status">
           <Activity className="h-5 w-5" />
@@ -153,9 +155,9 @@ export function DashboardPage() {
               label={metric.label}
               value={metric.value}
               unit={metric.unit}
-              status={metric.status || 'normal'}
-              hint={metric.hint || ''}
-              icon={icons[metric.key as keyof typeof icons]}
+              status={metric.status || "normal"}
+              hint={metric.hint || ""}
+              icon={icons[metric.key]}
             />
           ))
         )}
@@ -167,20 +169,16 @@ export function DashboardPage() {
             <div className="section-heading">
               <div>
                 <p className="eyebrow">Farm settings</p>
-                <h2>Crop & Soil type</h2>
+                <h2>Crop &amp; Soil type</h2>
               </div>
             </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
               <div className="farm-profile-field">
                 <label className="farm-profile-label">
                   <Leaf className="h-3.5 w-3.5" /> Crop type
                 </label>
-                <CropCombobox
-                  id="dashboard-crop"
-                  value={cropType}
-                  onChange={setCropType}
-                />
+                <CropCombobox id="dashboard-crop" value={cropType} onChange={setCropType} />
               </div>
 
               <div className="farm-profile-field">
@@ -192,37 +190,50 @@ export function DashboardPage() {
                   className="farm-profile-input"
                   value={soilType}
                   onChange={(e) => setSoilType(e.target.value)}
-                  style={{ cursor: 'pointer' }}
+                  style={{ cursor: "pointer" }}
                 >
                   <option value="">Select soil type...</option>
                   {SOIL_TYPES.map((type) => (
-                    <option key={type} value={type}>{type}</option>
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
                   ))}
                 </select>
               </div>
             </div>
 
-            {error && <p className="auth-error" role="alert" style={{ marginBottom: '1rem' }}>{error}</p>}
+            {error && (
+              <p className="auth-error" role="alert" style={{ marginBottom: "1rem" }}>
+                {error}
+              </p>
+            )}
 
             <button
               className="farm-save-btn"
               onClick={handleSaveFarm}
               disabled={saving}
-              style={{ width: '100%' }}
+              style={{ width: "100%" }}
             >
-              {saved
-                ? <><CheckCircle2 className="h-4 w-4" /> Saved!</>
-                : saving
-                  ? <><span className="auth-spinner" /> Saving…</>
-                  : <><Save className="h-4 w-4" /> Save changes</>
-              }
+              {saved ? (
+                <>
+                  <CheckCircle2 className="h-4 w-4" /> Saved!
+                </>
+              ) : saving ? (
+                <>
+                  <span className="auth-spinner" /> Saving…
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" /> Save changes
+                </>
+              )}
             </button>
           </div>
         </section>
       )}
 
       <section className="content-grid">
-            <AiRecommendationPanel />
+        <AiRecommendationPanel />
         <div className="agro-card lg:col-span-2">
           <div className="section-heading">
             <div>
@@ -234,10 +245,6 @@ export function DashboardPage() {
           <TrendChart data={trend} metrics={["moisture", "nitrogen", "potassium"]} />
         </div>
         <WeatherWidget />
-      </section>
-
-      <section className="content-grid">
-    
       </section>
     </div>
   );
