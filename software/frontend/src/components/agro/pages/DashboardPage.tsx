@@ -1,4 +1,4 @@
-import { Activity, CheckCircle2, Droplets, FlaskConical, Leaf, Save, Sprout, Zap } from "lucide-react";
+import { Activity, CheckCircle2, Droplets, FlaskConical, Leaf, Save, Sprout, Zap, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AiRecommendationPanel } from "../AiRecommendationPanel";
 import { MetricCard } from "../MetricCard";
@@ -18,11 +18,16 @@ type MetricData = {
 };
 
 type TrendData = {
-  timestamp: string;
-  [key: string]: string | number;
+  time: string;
+  moisture?: number;
+  ph?: number;
+  nitrogen?: number;
+  phosphorus?: number;
+  potassium?: number;
+  [key: string]: any;
 };
 
-const icons: Record<string, React.ComponentType<any>> = {
+const icons: Record<string, LucideIcon> = {
   moisture: Droplets,
   ph: FlaskConical,
   nitrogen: Leaf,
@@ -71,7 +76,12 @@ export function DashboardPage() {
         if (!mounted) return;
         setMetrics(data.metrics || []);
         setTrend((data.trend || []).map((point: any) => ({
-          timestamp: point.timestamp || new Date().toISOString(),
+          time: point.timestamp || point.time || new Date().toISOString(),
+          moisture: typeof point.moisture === "number" ? point.moisture : Number(point.moisture ?? NaN),
+          ph: typeof point.ph === "number" ? point.ph : Number(point.ph ?? NaN),
+          nitrogen: typeof point.nitrogen === "number" ? point.nitrogen : Number(point.nitrogen ?? NaN),
+          phosphorus: typeof point.phosphorus === "number" ? point.phosphorus : Number(point.phosphorus ?? NaN),
+          potassium: typeof point.potassium === "number" ? point.potassium : Number(point.potassium ?? NaN),
           ...point,
         })));
         setError(null);
@@ -242,7 +252,7 @@ export function DashboardPage() {
             </div>
             <span className="sync-pill">Updated now</span>
           </div>
-          <TrendChart data={trend} metrics={["moisture", "nitrogen", "potassium"]} />
+          <TrendChart data={trend} metrics={["moisture", "ph", "humidity"]} />
         </div>
         <WeatherWidget />
       </section>

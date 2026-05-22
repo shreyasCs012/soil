@@ -1,34 +1,86 @@
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
-import React, { useEffect, useState } from "react";
-import { getAlerts } from "../../../services/api";
+import { AlertTriangle, CheckCircle2, Droplets, Thermometer } from "lucide-react";
+import { useEffect, useState } from "react";
+import { getAlerts, getLatestSensorData } from "../../../services/api";
+
+const THRESHOLD_KEY = "agro_thresholds";
+const DEFAULT_THRESHOLDS = { moisture: 35, ph: 6.2, humidity: 75, temperature: 35 };
+
+function readThresholds() {
+  try {
+    const raw = localStorage.getItem(THRESHOLD_KEY);
+    if (raw) return { ...DEFAULT_THRESHOLDS, ...JSON.parse(raw) };
+  } catch { /* ignore */ }
+  return DEFAULT_THRESHOLDS;
+}
 
 export function AlertsPage() {
-  const [alerts, setAlerts] = useState<any[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [alerts, setAlerts]   = useState<any[]>([]);
+  const [error, setError]     = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
 
-    getAlerts()
-      .then((data) => {
-        if (!mounted) return;
-        setAlerts(data || []);
-      })
-      .catch((err) => {
-        if (err instanceof Error) {
-          setError(err.message);
-        } else {
-          setError(String(err));
-        }
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
+    async function load() {
+      try {
+        // Fetch backend alerts + latest sensor reading in parallel
+        const [backendAlerts, sensorRows] = await Promise.all([
+          getAlerts(),
+          getLatestSensorData(),
+        ]);
 
-    return () => {
-      mounted = false;
-    };
+        if (!mounted) return;
+
+        const thresholds = readThresholds();
+        const extra: any[] = [];
+
+        if (sensorRows && sensorRows.length > 0) {
+          const latest = sensorRows[0];
+          const humidity    = Number(latest.humidity    ?? 0);
+          const temperature = Number(latest.temperature ?? 0);
+          const now = new Date().toLocaleString("en-IN", {
+            day: "2-digit", month: "short", year: "numeric",
+            hour: "2-digit", minute: "2-digit",
+          });
+
+          if (humidity > thresholds.humidity) {
+            extra.push({
+              id:       "pump-humidity-client",
+              priority: "High",
+              time:     now,
+              title:    "💧 Water pump is ON — high humidity",
+              detail:   `Humidity is ${humidity.toFixed(1)}% — above your threshold of ${thresholds.humidity}%. Irrigation pump activated automatically.`,
+              action:   "Monitor water usage and soil saturation",
+              zone:     "Field sensor",
+            });
+          }
+
+          if (temperature > thresholds.temperature) {
+            extra.push({
+              id:       "pump-temperature-client",
+              priority: "High",
+              time:     now,
+              title:    "🌡️ Water pump is ON — high temperature",
+              detail:   `Temperature is ${temperature.toFixed(1)}°C — above your threshold of ${thresholds.temperature}°C. Pump activated to prevent heat stress.`,
+              action:   "Check field for heat stress; consider shade netting",
+              zone:     "Field sensor",
+            });
+          }
+        }
+
+        // Merge: put pump alerts first, then backend alerts (de-dupe by id prefix)
+        const backendIds = new Set((backendAlerts || []).map((a: any) => a.id));
+        const deduped = extra.filter((a) => !backendIds.has(a.id.replace("-client", "")));
+        setAlerts([...deduped, ...(backendAlerts || [])]);
+      } catch (err) {
+        if (mounted) setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    load();
+    return () => { mounted = false; };
   }, []);
 
   return (
@@ -36,7 +88,7 @@ export function AlertsPage() {
       <section className="page-header">
         <p className="eyebrow">Smart alerts</p>
         <h1>Prioritized field actions</h1>
-        <p>Clear recommendations ranked by urgency so farmers can act quickly.</p>
+        <p>Alerts ranked by urgency — humidity and temperature thresholds trigger the water pump automatically.</p>
       </section>
 
       {loading ? (
@@ -44,25 +96,35 @@ export function AlertsPage() {
       ) : error ? (
         <div className="message message-error">{error}</div>
       ) : alerts.length === 0 ? (
-        <div className="text-sm text-muted-foreground">No alerts are active right now.</div>
+        <div className="text-sm text-muted-foreground">No alerts are active — all sensor values within safe thresholds.</div>
       ) : (
         <section className="alert-list">
-          {alerts.map((alert) => (
-            <article key={alert.id} className={`agro-card alert-card priority-${alert.priority}`}>
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4">
-                  <div className="metric-icon"><AlertTriangle className="h-5 w-5" /></div>
-                  <div>
-                    <p className="alert-priority">{alert.priority} priority · {alert.time}</p>
-                    <h2 className="mt-1 text-xl font-black text-foreground">{alert.title}</h2>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">{alert.detail}</p>
+          {alerts.map((alert) => {
+            const isPumpAlert = alert.id?.startsWith("pump-");
+            return (
+              <article
+                key={alert.id}
+                className={`agro-card alert-card priority-${alert.priority.toLowerCase()}${isPumpAlert ? " pump-alert" : ""}`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <div className="metric-icon">
+                      {isPumpAlert && alert.id.includes("humidity")   ? <Droplets className="h-5 w-5" />    :
+                       isPumpAlert && alert.id.includes("temperature") ? <Thermometer className="h-5 w-5" /> :
+                       <AlertTriangle className="h-5 w-5" />}
+                    </div>
+                    <div>
+                      <p className="alert-priority">{alert.priority} priority · {alert.time}</p>
+                      <h2 className="mt-1 text-xl font-black text-foreground">{alert.title}</h2>
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground">{alert.detail}</p>
+                    </div>
                   </div>
+                  <span className="sync-pill">{alert.zone}</span>
                 </div>
-                <span className="sync-pill">{alert.zone}</span>
-              </div>
-              <div className="alert-action"><CheckCircle2 className="h-5 w-5" /> {alert.action}</div>
-            </article>
-          ))}
+                <div className="alert-action"><CheckCircle2 className="h-5 w-5" /> {alert.action}</div>
+              </article>
+            );
+          })}
         </section>
       )}
     </div>

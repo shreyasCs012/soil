@@ -1,4 +1,4 @@
-import { Bell, CheckCircle2, ChevronDown, Droplets, FlaskConical, Leaf, Locate, MapPin, Save, Sprout } from "lucide-react";
+import { Bell, CheckCircle2, ChevronDown, Droplets, FlaskConical, Locate, MapPin, Save, Sprout, Thermometer } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { CropCombobox } from "../CropCombobox";
 import { getMe, updateFarm, type FarmData } from "../../../services/api";
@@ -230,11 +230,33 @@ function ThresholdControl({ icon: Icon, label, unit, value, min, max, step = 1, 
   );
 }
 
+const THRESHOLD_KEY = "agro_thresholds";
+
+function loadThresholds() {
+  try {
+    const raw = localStorage.getItem(THRESHOLD_KEY);
+    if (raw) return { ...defaultThresholds, ...JSON.parse(raw) };
+  } catch { /* ignore */ }
+  return defaultThresholds;
+}
+
+const defaultThresholds = { moisture: 35, ph: 6.2, humidity: 75, temperature: 35 };
+
 // ── Page ──────────────────────────────────────────────────────────────────
 export function SettingsPage() {
   const [notifications, setNotifications] = useState(true);
   const [irrigationOn, setIrrigationOn]   = useState(false);
-  const [thresholds, setThresholds]       = useState({ moisture: 35, ph: 6.2, npk: 45 });
+  const [thresholds, setThresholds]       = useState(loadThresholds);
+
+  // Persist thresholds to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem(THRESHOLD_KEY, JSON.stringify(thresholds));
+  }, [thresholds]);
+
+  const pumpActive =
+    irrigationOn ||
+    thresholds.humidity > 75 ||   // visual hint when settings exceed typical range
+    thresholds.temperature > 35;
 
   return (
     <div className="page-stack">
@@ -251,16 +273,18 @@ export function SettingsPage() {
       <section className="content-grid">
         <article className="agro-card irrigation-card">
           <p className="eyebrow">Irrigation control</p>
-          <h2>System is {irrigationOn ? "ON" : "OFF"}</h2>
+          <h2>Pump is {pumpActive ? "ON 💧" : "OFF"}</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Current pump state is simulated locally for the demo dashboard.
+            {pumpActive && !irrigationOn
+              ? "Auto-activated: humidity or temperature exceeded threshold."
+              : "Manual override — pump state is simulated for the demo."}
           </p>
           <button
             className="irrigation-toggle"
             aria-pressed={irrigationOn}
             onClick={() => setIrrigationOn((v) => !v)}
           >
-            <span>{irrigationOn ? "Stop irrigation" : "Start irrigation"}</span>
+            <span>{irrigationOn ? "Stop pump" : "Start pump manually"}</span>
             <span className="toggle-track"><span className="toggle-thumb" /></span>
           </button>
         </article>
@@ -293,10 +317,25 @@ export function SettingsPage() {
           </div>
         </div>
         <div className="threshold-grid">
-          <ThresholdControl icon={Droplets}     label="Moisture" unit="%" value={thresholds.moisture} onChange={(v) => setThresholds((p) => ({ ...p, moisture: v }))} min={15} max={70} />
-          <ThresholdControl icon={FlaskConical} label="pH"       unit="pH" value={thresholds.ph}      onChange={(v) => setThresholds((p) => ({ ...p, ph: v }))}      min={4}  max={8}  step={0.1} />
-          <ThresholdControl icon={Leaf}         label="NPK"      unit="ppm" value={thresholds.npk}    onChange={(v) => setThresholds((p) => ({ ...p, npk: v }))}     min={20} max={90} />
+          <ThresholdControl
+            icon={Droplets}     label="Soil Moisture"  unit="%" value={thresholds.moisture}
+            onChange={(v) => setThresholds((p) => ({ ...p, moisture: v }))}    min={15} max={70} />
+          <ThresholdControl
+            icon={FlaskConical} label="pH"             unit="pH" value={thresholds.ph}
+            onChange={(v) => setThresholds((p) => ({ ...p, ph: v }))}          min={4}  max={8}  step={0.1} />
+          <ThresholdControl
+            icon={Droplets}     label="Humidity"       unit="%" value={thresholds.humidity}
+            onChange={(v) => setThresholds((p) => ({ ...p, humidity: v }))}    min={40} max={100} />
+          <ThresholdControl
+            icon={Thermometer}  label="Temperature"    unit="°C" value={thresholds.temperature}
+            onChange={(v) => setThresholds((p) => ({ ...p, temperature: v }))} min={20} max={50} />
         </div>
+        {(thresholds.humidity <= 100 || thresholds.temperature <= 50) && (
+          <p className="mt-4 text-sm text-muted-foreground">
+            💧 When humidity exceeds <strong>{thresholds.humidity}%</strong> or temperature exceeds{" "}
+            <strong>{thresholds.temperature}°C</strong>, the water pump activates automatically and an alert is raised.
+          </p>
+        )}
       </section>
     </div>
   );
